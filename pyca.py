@@ -92,21 +92,36 @@ class lattice () :
     INPUTS:
         ca -- CA rule object
         C  -- CA configuration (can be a list, n-D array or string)
-        b  -- boundary type (the default 'cyclic' or a configuration of length ca.m-1)
-        dtype -- cell value data type (default is 'uint8')
+        b  -- boundary type (default 'cyclic')
+        dtype -- cell value data type (default 'uint8')
+
+    METHODS:
+        next(t) -- compute t time steps (default t is 1)
 
     INTERNALS:
         N  -- lattice size as number of cells in each dimension
-        Cc -- internal 'uint8' array representation of the cell lattice
-        Cn -- internal 'uint8' array representation of the neighborhood lattice
+        Cc -- internal array representation of the cell lattice
+        Cn -- internal array representation of the neighborhood lattice
 
-    Since internal array types are of size 'uint8', the number of states per cell
-    is limited to 256.
+    The configuration can be initialized from different data types depending on
+    the number of dimensions:
+    1D -- numpy.ndarray, list or string
+    2D -- numpy.ndarray, list of lists or strings, or from images (png, bmp, ...)
+    nD -- numpy.ndarray only
 
-    If the CA boundary is defined as 'cyclic' than actually there is no boundary,
-    otherwise the boundary can be defined explicitly as a concatenation of the
-    left and the right boundary [b_L+b_R], which can be of the same types as the
-    configuration.
+    By default the internal arrays are of type 'uint8', the number of states
+    per cell is limited to 256.
+
+    The supported boundary tipes are 'cyclic and 'open'.
+    The 'cyclic' or periodic boundary is used when the each boundary is
+    directly conected to the oposite boundary (1D - start <=> end,
+    2D - left <=> right, top <=> bottom). 
+    The 'open' boundary is used when the defined configuration is only a
+    segment of an infinite configuration, where cells outside the observed
+    segment can have any value.
+
+    The next(t) method computes t discrete time steps, the prev() method
+    computes a list of preimages, the results depends on the boundary type.
     """
     def __init__(lt, ca, C, b='cyclic', dtype='uint8') :
         lt.ca = ca
@@ -114,40 +129,99 @@ class lattice () :
         # detecting the CA type
         if ( (lt.ca.d==1) & (lt.ca.a == tuple([tuple([x+lt.ca.a[0][0]]) for x in range(lt.ca.m)])) ) :
             lt.type = '1D'
-            lt.sh = - lt.ca.a[0][0]
         else :
             lt.type = 'general'
         # parsing the input configuration
-        if (type(C) in (numpy.ndarray, list)) :
-            lt.Cc = numpy.array(C, dtype=dtype)
+        if (lt.ca.d == 1) :
+            # 1D CA can be initialized from numpy.ndarray, list or string
+            if (type(C) in (numpy.ndarray, list)) :
+                lt.Cc = numpy.array(C, dtype=dtype)
+            elif (type(C) in (string,)) :
+                lt.Cc = numpy.fromstring(C, dtype=dtype)-int(48)
+            else :
+                print "Error: incompattible configuration"
+                return
+        elif (lt.ca.d == 1) :
+            # 2D CA can be initialized from numpy.ndarray, list of lists or strings, or from images
+            if (type(C) in (numpy.ndarray,)) :
+                lt.Cc = numpy.array(C, dtype=dtype)
+            elif (type(C) in (list,)) :
+                if (type(C[0]) in (list,)) :
+                    lt.Cc = numpy.array(C, dtype=dtype)
+                elif (type(C) in (string,)) :
+                    lt.Cc = numpy.empty(lt.N, dtype=dtype)
+                    for y in range(len(C)) :
+                        lt.Cc = numpy.fromstring(C[y], dtype=dtype)-int(48)
+                else :
+                    print "Error: incompattible configuration"
+                    return
+            else :
+                print "Error: incompattible configuration"
+                return
         else :
-            dx = [0 for _ in range(lt.ca.d)]
-            # TODO generalize for any number of dimensions
-            lt.Cc = numpy.fromstring(C, dtype=dtype)-int(48)
+            # nD CA where n>2 can only be initialized from numpy.ndarray
+            if (type(C) in (numpy.ndarray,)) :
+                lt.Cc = numpy.array(C, dtype=dtype)
+            else :
+                print "Error: incompattible configuration"
+                return
+        # an empty array for neighborhoods, can be used for temporal results
         lt.Cn = numpy.empty(lt.N, dtype=dtype)
         # parsing the input boundary
-        if (b == 'cyclic') :
+        if (b in ('cyclic', 'open')) :
             lt.b = b
         else :
-            if (type(b) in (numpy.ndarray, list)) :
-                lt.b = numpy.array(b, dtype=dtype)
-            else :
-                lt.b = numpy.fromstring(b, dtype=dtype)-int(48)
+            print "Error: currently only 'cyclic' and 'open' boundaries are supported"
+            return
 
     def __repr__(lt):
         return repr((lt.Cc+int(48)).tostring())
 
-    def next (lt) :
+    def next (lt, t=1) :
         """
         Performs a step forward in time, the result is stored back into the
         configuration 'Cc'. As a partial result the neighborhood configuration is
         computed an stored into 'Cn'.
         """
         if (lt.type == '1D') :
-            ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
             if (lt.b == 'cyclic') :
-                lt.Cc = numpy.concatenate((lt.Cc[lt.N-lt.sh:lt.N], lt.Cc[0:lt.N-lt.sh]), axis=0)
+                for _ in xrange(t) :
+                    ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                shift = t * (-lt.ca.a[0][0])
+                lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
             else :
-                lt.Cc = lt.Cc[0:lt.N-(ca.m-1)]
-            return
+                for _ in xrange(t) :
+                    ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                    lt.N = lt.N - (lt.ca.m-1)
+                    lt.Cc = lt.Cc[0:lt.N]
+        else :
+            print "Error: feature not yet implemented"
+        return
+
+    def cfg2image (lt, name) :
+        """
+        writes the current configuration into an image file
+        """
+        return
+
+    def run2image (lt, t, name) :
+        """
+        computes t time steps and writes the resulting configurations into an image or video
+        """
+        if (lt.ca.d == 1) :
+           #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.k == 2) ) :
+            if (lt.ca.k == 2) :
+                cc_t = numpy.empty([t+1, lt.N], dtype='uint8')
+                cc_t [0] = lt.Cc
+                for y in range(t) :
+                    lt.next()
+                    cc_t [y+1] = lt.Cc
+                img = Image.fromstring('P', (cc_t.shape[1], cc_t.shape[0]), cc_t.tostring());
+                img.putpalette([0,0,0,255,255,255]);
+                img.save(name+"%04u.png"%t, "PNG")
+            else :
+                print "Error: feature not yet implemented, unsuported 1D CA parameters"
+        else :
+            print "Error: feature not yet implemented"
+        return
 
