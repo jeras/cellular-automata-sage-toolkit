@@ -13,7 +13,6 @@ cdef extern from 'arrayobject.h' :
         cdef intp *strides
         cdef int flags
 
-#cdef public ca1d_next_generic (int k, int m, ndarray f, ndarray Cc, ndarray Cn, int N, int sh, int b) :
 def ca1d_next_generic (int k, int m, ndarray f, int N, ndarray Cc, ndarray Cn) :
     """
     Generic version of 1D CA processor.
@@ -40,7 +39,7 @@ def ca1d_next_generic (int k, int m, ndarray f, int N, ndarray Cc, ndarray Cn) :
         w = 1
         for x from 0 <= x < m-1 :
             n = n * k + pc[x]  # preparing the first overlap
-            w = w * k          # seting the weight
+            w = w * k          # setting the weight
      
         # building of neighborhoods
         for x from 0 <= x < N :

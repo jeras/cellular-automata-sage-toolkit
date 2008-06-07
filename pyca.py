@@ -1,9 +1,9 @@
 """
 SAGE/Python Cellular Automata Toolkit Module
 
-Toolkit for theretical and prectical research of cellular automata. The
+Toolkit for theoretical and practical research of cellular automata. The
 theoretical part focuses on the computation of preimages, the practical on
-creating images and videos of CA. The proposed pronounciation of the "pyca"
+creating images and videos of CA. The proposed pronunciation of the "pyca"
 toolkit is the same as the Italian dish pizza.
 
 AUTHORS:
@@ -96,15 +96,15 @@ class lattice () :
         dtype -- cell value data type (default is 'uint8')
 
     INTERNALS:
-        N  -- lattice size as number of cels in each dimension
+        N  -- lattice size as number of cells in each dimension
         Cc -- internal 'uint8' array representation of the cell lattice
         Cn -- internal 'uint8' array representation of the neighborhood lattice
 
-    Since internal array tipes are of size 'uint8', the number of states per cell
+    Since internal array types are of size 'uint8', the number of states per cell
     is limited to 256.
 
     If the CA boundary is defined as 'cyclic' than actually there is no boundary,
-    otherwise the boundary can be defined explicitely as a concatenation of the
+    otherwise the boundary can be defined explicitly as a concatenation of the
     left and the right boundary [b_L+b_R], which can be of the same types as the
     configuration.
     """
@@ -140,7 +140,7 @@ class lattice () :
     def next (lt) :
         """
         Performs a step forward in time, the result is stored back into the
-        configuration 'Cc'. As a partial rasult the neighborhood configuration is
+        configuration 'Cc'. As a partial result the neighborhood configuration is
         computed an stored into 'Cn'.
         """
         if (lt.type == '1D') :
