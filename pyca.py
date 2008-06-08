@@ -35,12 +35,18 @@ EXAMPLES:
     '11011111000100'
     '11110001001101'
     '00010011011111'
+
+    Creation of an image of a 1D CA run. The initial configuration is 1024
+    cells with random value, the preciously defined rule 110 CA is used.
+    The output image is stored into a local file "rule110_rqndom.png"
+
+    sage: lt = pyca.lattice (ca, numpy.random.random_integers(0,1,(1024)))
+    sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_rqndom')
 """
 
 import numpy
-import Image
 import ca1d
-
+import ca_vizual
 
 class rule () :
     """
@@ -198,30 +204,20 @@ class lattice () :
             print "Error: feature not yet implemented"
         return
 
-    def cfg2image (lt, name) :
-        """
-        writes the current configuration into an image file
-        """
-        return
-
-    def run2image (lt, t, name) :
-        """
-        computes t time steps and writes the resulting configurations into an image or video
-        """
+    def run (lt, t, out='Cc') :
         if (lt.ca.d == 1) :
            #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.k == 2) ) :
             if (lt.ca.k == 2) :
-                cc_t = numpy.empty([t+1, lt.N], dtype='uint8')
-                cc_t [0] = lt.Cc
+                cct = numpy.empty([t+1, lt.N], dtype='uint8')
+                if   (out == 'Cc') :  cct [0] = lt.Cc
+                elif (out == 'Cn') :  cct [0] = lt.Cn
+                else :
+                    print "Error: wrong out parameter"
                 for y in range(t) :
                     lt.next()
-                    cc_t [y+1] = lt.Cc
-                img = Image.fromstring('P', (cc_t.shape[1], cc_t.shape[0]), cc_t.tostring());
-                img.putpalette([0,0,0,255,255,255]);
-                img.save(name+"%04u.png"%t, "PNG")
-            else :
-                print "Error: feature not yet implemented, unsuported 1D CA parameters"
+                    if   (out == 'Cc') :  cct [y+1] = lt.Cc
+                    elif (out == 'Cn') :  cct [y+1] = lt.Cn
         else :
-            print "Error: feature not yet implemented"
-        return
+            print "Error: feature not yet implemented, only 1D CA are supported"
+        return cct
 
