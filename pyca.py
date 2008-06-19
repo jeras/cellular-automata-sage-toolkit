@@ -40,8 +40,9 @@ EXAMPLES:
     cells with random value, the preciously defined rule 110 CA is used.
     The output image is stored into a local file "rule110_rqndom.png"
 
+    sage: import numpy
     sage: lt = pyca.lattice (ca, numpy.random.random_integers(0,1,(1024)))
-    sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_rqndom')
+    sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
 
 import numpy
@@ -73,6 +74,7 @@ class rule () :
              (type(ca.a[0]) not in (tuple,)) ) :
            #ca.a = [[x] for x in ca.a]
             ca.a = tuple([tuple([x]) for x in ca.a])
+        ca.sh = -ca.a[0][0]
         ca.d = len(ca.a[0])
         ca.r = r
         ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in xrange(ca.k**ca.m)], dtype='uint8')
@@ -84,12 +86,44 @@ class rule () :
                 o_l = n // ca.k; o_r = n % (ca.k**(ca.m-1))
                 ca.D [ca.f[n]] [o_l, o_r] = 1
 
-    #        ca.Sf = [ [ list2int (list2bool (vector(int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
-    #        ca.Sb = [ [ list2int (list2bool (ca.D[c] * vector(int2list(i, ca.k, ca.k**(ca.m-1)))), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
+        ca.Sf = [ [ list2int (list2bool (numpy.array(numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c])[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
+#        ca.Sb = [ [ list2int (list2bool (ca.D[c] * numpy.mat (int2list(i, ca.k, ca.k**(ca.m-1)))), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
 
     def __repr__(ca):
         return "Cellular Automaton (states = "+str(ca.k)+", neighborhood = "+str(ca.a)+", rule = "+str(ca.r)+")"
 
+# a couple of auxiliary functions
+def int2list (x, r, n) :
+    """
+    Translates number x into a list l of n digits base r (LSB first list).
+    INPUTS:
+        x -- the number to translate
+        r -- base
+        n -- digits
+    OUTPUT:
+        l -- list of digits
+    """
+    l = []
+    for i in xrange(n) : l.append(int(x)%int(r)); x=int(x)/int(r)
+    return l
+
+def list2int (l, r) :
+    """
+    Translates a list l of n digits base r into an integer x (LSB first list).
+    INPUTS:
+        l -- list of digits
+        r -- base
+    OUTPUT:
+        x -- integer
+    """
+    x = 0
+    for i in xrange(len(l)) : x = x + l[i] * r**i
+    return x
+
+def list2bool (l) :
+    for i in xrange(len(l)) : 
+        if (l[i] > 0) : l[i] = 1 
+    return [int(l[i]>0) for i in xrange(len(l))]
 
 class lattice () :
     """
@@ -142,7 +176,7 @@ class lattice () :
             # 1D CA can be initialized from numpy.ndarray, list or string
             if (type(C) in (numpy.ndarray, list)) :
                 lt.Cc = numpy.array(C, dtype=dtype)
-            elif (type(C) in (string,)) :
+            elif (type(C) in (str,)) :
                 lt.Cc = numpy.fromstring(C, dtype=dtype)-int(48)
             else :
                 print "Error: incompattible configuration"
@@ -200,6 +234,18 @@ class lattice () :
                     ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
                     lt.N = lt.N - (lt.ca.m-1)
                     lt.Cc = lt.Cc[0:lt.N]
+        elif ( (lt.type == 'general') & (lt.ca.d == 2)) :
+            if (lt.b == 'cyclic') :
+                for _ in xrange(t) :
+                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                shift = t * (-lt.ca.a[0][0])
+                lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
+            else :
+                for _ in xrange(t) :
+                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                    lt.N = lt.N - (lt.ca.m-1)
+                    lt.Cc = lt.Cc[0:lt.N]
+            
         else :
             print "Error: feature not yet implemented"
         return
@@ -208,16 +254,94 @@ class lattice () :
         if (lt.ca.d == 1) :
            #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.k == 2) ) :
             if (lt.ca.k == 2) :
-                cct = numpy.empty([t+1, lt.N], dtype='uint8')
-                if   (out == 'Cc') :  cct [0] = lt.Cc
-                elif (out == 'Cn') :  cct [0] = lt.Cn
+                Ct = numpy.empty([t+1, lt.N], dtype='uint8')
+                if   (out == 'Cc') :  Ct [0] = lt.Cc
+                elif (out == 'Cn') :  Ct [0] = lt.Cn
                 else :
                     print "Error: wrong out parameter"
                 for y in range(t) :
                     lt.next()
-                    if   (out == 'Cc') :  cct [y+1] = lt.Cc
-                    elif (out == 'Cn') :  cct [y+1] = lt.Cn
+                    if   (out == 'Cc') :  Ct [y+1] = lt.Cc
+                    elif (out == 'Cn') :  Ct [y+1] = lt.Cn
         else :
             print "Error: feature not yet implemented, only 1D CA are supported"
-        return cct
+        return Ct
 
+    def isGoE (lt) :
+        if ((lt.ca.d == 1) and (lt.b == 'open')) :
+            s = 2**(lt.ca.k**(lt.ca.m-1))-1
+            for x in xrange(lt.N) : s = lt.ca.Sf[lt.Cc[x]][s];
+            return (s == 0)
+        else :
+            return "Unsupported boundary"
+
+    def prev (lt) :
+        if (lt.ca.d == 1) :
+         
+            C_p = []
+
+            if (lt.b == 'cyclic') :
+                lt.D_x_b = [numpy.identity(lt.ca.k**(lt.ca.m-1), dtype="int")]
+                for x in xrange(lt.N) :
+                    lt.D_x_b.append (lt.ca.D[lt.Cc[lt.N-1-x]] * lt.D_x_b[x])
+                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in xrange(lt.ca.k**(lt.ca.m-1))])
+ 
+                C_p = [lattice(lt.ca, lt.N*[0], lt.b) for i in xrange(lt.p)]
+                o_p0 = [];
+                for o in xrange(lt.ca.k**(lt.ca.m-1)) :
+                    o_p0.extend([o for d in xrange(lt.D_x_b[lt.N][o,o])])
+                o_p = list(o_p0)
+               
+                for x in xrange(lt.N) :
+                    i = 0
+                    while (i<lt.p) :
+                        o_L = o_p[i]; o_R = o_p0[i]
+                        for c in xrange(lt.ca.k) :
+                            n = o_L * lt.ca.k + c
+                            if (lt.Cc[x] == lt.ca.f[n]) :
+                                o_x = n % (lt.ca.k**(lt.ca.m-1))
+                                p_i = lt.D_x_b[lt.N-x-1][o_x,o_R]
+                                for p_c in xrange(p_i) :
+                                    C_p[i].Cc [(x+lt.ca.sh) % lt.N] = c
+                                    o_p[i] = o_x
+                                    i = i+1
+
+                return C_p
+
+            elif (lt.b == 'open') :
+                b_L = b_R = numpy.matrix((lt.ca.k**(lt.ca.m-1))*[1])
+                lt.b_x_b = [b_R.T]
+#              else :
+#                b_L = (lt.b[0]); b_R = vector(lt.b[1])
+#                lt.b_x_b = [b_R]
+
+                x = 0
+                for x in xrange(lt.N) :
+                    lt.b_x_b.append (lt.ca.D[lt.Cc[lt.N-1-x]] * lt.b_x_b[x])
+                lt.p = (b_L * lt.b_x_b[lt.N-1])[0,0]
+
+                C_p = [lattice(lt.ca, (lt.N+lt.ca.m-1)*[0], lt.b) for i in xrange(lt.p)]
+                o_p = [];
+                for o in xrange(lt.ca.k**(lt.ca.m-1)) :
+                    o_p.extend([o for d in xrange(b_L[0,o] * lt.b_x_b[lt.N][o,0])])
+                for i in xrange(lt.p) :
+                    C_p[i].Cc [0:lt.ca.m-1] = int2list(o_p[i], lt.ca.k, lt.ca.m-1)
+
+                for x in xrange(lt.N) :
+                    i = 0
+                    while (i<lt.p) :
+                        o_L = o_p[i];
+                        for c in xrange(lt.ca.k) :
+                            n = o_L * lt.ca.k + c
+                            if (lt.Cc[x] == lt.ca.f[n]) :
+                                o_x = n % (lt.ca.k**(lt.ca.m-1))
+                                p_i = lt.b_x_b[lt.N-x-1][o_x]
+                                for p_c in xrange(p_i) :
+                                    C_p[i].Cc [x+lt.ca.m-1] = c
+                                    o_p[i] = o_x
+                                    i = i+1
+
+                return C_p
+
+            else :
+                print "Error: there is no preimage implementation for automata with more than 1 dimensions." 
