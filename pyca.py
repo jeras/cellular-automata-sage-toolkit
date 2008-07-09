@@ -44,6 +44,7 @@ EXAMPLES:
     sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
 
+import sage
 import numpy
 import ca1d
 import ca_vizual
@@ -79,6 +80,9 @@ class rule (object) :
         ca.k = k
         ca.a = a
         ca.r = r
+
+    def __repr__(ca):
+        return "Cellular Automaton (states = "+str(ca.k)+", neighborhood = "+str(ca.a)+", rule = "+str(ca.r)+")"
 
     def get_a (ca) :
         return ca.__a
@@ -121,8 +125,21 @@ class rule (object) :
        #ca.Sb = [ [ list2int (list2bool (numpy.array(ca.D[c] * numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))))[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
     r = property(get_r, set_r)
 
-    def __repr__(ca):
-        return "Cellular Automaton (states = "+str(ca.k)+", neighborhood = "+str(ca.a)+", rule = "+str(ca.r)+")"
+    def GoE_count(ca, N) :
+        M = numpy.zeros ((2**(ca.k**(ca.m-1)), 2**(ca.k**(ca.m-1))), int)
+        for c in xrange(ca.k) :
+            for i in xrange(2**(ca.k**(ca.m-1))) :
+                 M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
+        M = numpy.matrix (M)
+        V = numpy.zeros (2**(ca.k**(ca.m-1)), int)
+        V[2**(ca.k**(ca.m-1))-1] = 1
+        V = numpy.matrix (V)
+        L = []
+        for _ in xrange(N) :
+            L.append (V[0,0])
+            V = V*M
+        #Lf = [float(L[i]/2**i) for i in range(len(L))]  # float GoE density
+        return L
 
 # a couple of auxiliary functions
 def int2list (x, r, n) :
