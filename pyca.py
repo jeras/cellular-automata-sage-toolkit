@@ -27,7 +27,6 @@ EXAMPLES:
     sage: lt
     '00010011011111'
     sage: for _ in xrange(7) : lt.next(); lt
-    ....:
     '00110111110001'
     '01111100010011'
     '11000100110111'
@@ -40,7 +39,7 @@ EXAMPLES:
     cells with random value, the preciously defined rule 110 CA is used.
     The output image is stored into a local file "rule110_rqndom.png"
 
-    sage: import numpy
+    sage: import numpy, ca_vizual
     sage: lt = pyca.lattice (ca, numpy.random.random_integers(0,1,(1024)))
     sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
@@ -49,7 +48,16 @@ import numpy
 import ca1d
 import ca_vizual
 
-class rule () :
+ca_neighborhood_by_name = {
+    'elementary'  : ((-1,), (0,), (1,)),
+    'trid'        : ((0,0), (0,1), (1,0)),
+    'quad'        : ((0,0), (0,1), (1,0), (1,1)),
+    'von Neumann' : ((0,-1), (-1,0), (0,0), (+1,0), (0,+1)),
+    'Moore'       : ((-1,-1), (0,-1), (+1,-1), (-1,0), (0,0), (+1,0), (-1,+1), (0,+1), (+1,+1)),
+    'hex'         : ()
+}
+
+class rule (object) :
     """
     A CA rule is a tuple defined by three parameters (k, m, r).
     
@@ -61,33 +69,57 @@ class rule () :
     INTERNALS:
         m  -- neighborhood size (number of cells composing a neighborhood)
         d  -- number of dimensions
+        f  -- local tansition function (lookup table)
         D  -- a list of $k$ de Bruijn matrices
         Sf -- forward state machine
         Sb -- backward state machine
     """
+
     def __init__(ca, k, a, r):
         ca.k = k
         ca.a = a
-        ca.m = len(ca.a)
-       #if (type(ca.a[0]) not in (tuple, list))
-        if ( (type(ca.a   ) not in (tuple,)) or
-             (type(ca.a[0]) not in (tuple,)) ) :
-           #ca.a = [[x] for x in ca.a]
-            ca.a = tuple([tuple([x]) for x in ca.a])
-        ca.sh = -ca.a[0][0]
-        ca.d = len(ca.a[0])
         ca.r = r
-        ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in xrange(ca.k**ca.m)], dtype='uint8')
 
+    def get_a (ca) :
+        return ca.__a
+    def set_a (ca, a) :
+        # the neighborhood is provided by its common name
+        if (type(a) is str) :
+            try :
+                ca.__a = ca_neighborhood_by_name [a]
+            except KeyError :
+                print "Error: unsupported neighborhood name"
+                return
+        # check if the neighborhood is a tuple, otherwise translate it
+        else :
+            if ( (type(a   ) not in (tuple,)) or
+                 (type(a[0]) not in (tuple,)) ) :
+                if (type(a[0]) in (list,)) :
+                    ca.__a = tuple([tuple( x ) for x in a])
+                else :
+                    ca.__a = tuple([tuple([x]) for x in a])
+        # set neighborhood related parameters
+        ca.m = len(ca.__a)
+        ca.d = len(ca.__a[0])
+        ca.sh = -ca.__a[0][0]
+    a = property(get_a, set_a)
+
+    def get_r (ca) :
+        return ca.__r
+    def set_r (ca, r) :
+        ca.__r = r
+        # build transition lookup table
+        ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in xrange(ca.k**ca.m)], dtype='uint8')
         # for 1D CA some rule properties can be computed
         if (ca.d == 1) :
             ca.D = [numpy.mat (numpy.zeros ((ca.k**(ca.m-1), ca.k**(ca.m-1)), int)) for k in xrange(ca.k)]
             for n in xrange(ca.k**ca.m) :
                 o_l = n // ca.k; o_r = n % (ca.k**(ca.m-1))
                 ca.D [ca.f[n]] [o_l, o_r] = 1
-
+        # construct the subset diagram
         ca.Sf = [ [ list2int (list2bool (numpy.array(numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c])[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
-#        ca.Sb = [ [ list2int (list2bool (ca.D[c] * numpy.mat (int2list(i, ca.k, ca.k**(ca.m-1)))), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
+       #ca.Sb = [ [ list2int (list2bool (numpy.array(ca.D[c] * numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))))[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
+    r = property(get_r, set_r)
 
     def __repr__(ca):
         return "Cellular Automaton (states = "+str(ca.k)+", neighborhood = "+str(ca.a)+", rule = "+str(ca.r)+")"
@@ -124,6 +156,7 @@ def list2bool (l) :
     for i in xrange(len(l)) : 
         if (l[i] > 0) : l[i] = 1 
     return [int(l[i]>0) for i in xrange(len(l))]
+
 
 class lattice () :
     """

@@ -9,7 +9,7 @@ from   Cython.Distutils    import build_ext
 INCLUDE_DIRS = [os.path.join(os.environ['SAGE_ROOT'], 'local/lib/python2.5/site-packages/', 'numpy/core/include/numpy/')]
 
 setup( name        = 'pyca',
-       version     = '0.2.1',
+       version     = '0.2.2',
        description = 'SAGE/Python Cellular Automata Toolkit',
        author      = 'Iztok Jeras',
        author_email= 'iztok.jeras@rattus.info',
