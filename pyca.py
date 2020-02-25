@@ -26,7 +26,7 @@ EXAMPLES:
     sage: lt = pyca.lattice (ca, [0,0,0,1,0,0,1,1,0,1,1,1,1,1])
     sage: lt
     '00010011011111'
-    sage: for _ in xrange(7) : lt.next(); lt
+    sage: for _ in range(7) : lt.next(); lt
     '00110111110001'
     '01111100010011'
     '11000100110111'
@@ -44,10 +44,11 @@ EXAMPLES:
     sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
 
-import sage
+#import sage
 import numpy
-import ca1d
-import ca_vizual
+import pyca_1d     as ca1d
+import pyca_common as common
+#import ca_vizual
 
 ca_neighborhood_by_name = {
     'elementary'  : ((-1,), (0,), (1,)),
@@ -92,7 +93,7 @@ class rule (object) :
             try :
                 ca.__a = ca_neighborhood_by_name [a]
             except KeyError :
-                print "Error: unsupported neighborhood name"
+                print("Error: unsupported neighborhood name")
                 return
         # check if the neighborhood is a tuple, otherwise translate it
         else :
@@ -113,66 +114,33 @@ class rule (object) :
     def set_r (ca, r) :
         ca.__r = r
         # build transition lookup table
-        ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in xrange(ca.k**ca.m)], dtype='uint8')
+        ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in range(ca.k**ca.m)], dtype='uint8')
         # for 1D CA some rule properties can be computed
         if (ca.d == 1) :
-            ca.D = [numpy.mat (numpy.zeros ((ca.k**(ca.m-1), ca.k**(ca.m-1)), int)) for k in xrange(ca.k)]
-            for n in xrange(ca.k**ca.m) :
+            ca.D = [numpy.mat (numpy.zeros ((ca.k**(ca.m-1), ca.k**(ca.m-1)), int)) for k in range(ca.k)]
+            for n in range(ca.k**ca.m) :
                 o_l = n // ca.k; o_r = n % (ca.k**(ca.m-1))
                 ca.D [ca.f[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ list2int (list2bool (numpy.array(numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c])[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
-       #ca.Sb = [ [ list2int (list2bool (numpy.array(ca.D[c] * numpy.mat(int2list(i, ca.k, ca.k**(ca.m-1))))[0]), ca.k) for i in xrange(2**(ca.k**(ca.m-1))) ] for c in xrange(ca.k) ]
+        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c])[0]), ca.k) for i in range(2**(ca.k**(ca.m-1))) ] for c in range(ca.k) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.D[c] * numpy.mat(common.int2list(i, ca.k, ca.k**(ca.m-1))))[0]), ca.k) for i in range(2**(ca.k**(ca.m-1))) ] for c in range(ca.k) ]
     r = property(get_r, set_r)
 
     def GoE_count(ca, N) :
         M = numpy.zeros ((2**(ca.k**(ca.m-1)), 2**(ca.k**(ca.m-1))), int)
-        for c in xrange(ca.k) :
-            for i in xrange(2**(ca.k**(ca.m-1))) :
+        for c in range(ca.k) :
+            for i in range(2**(ca.k**(ca.m-1))) :
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
         M = numpy.matrix (M)
         V = numpy.zeros (2**(ca.k**(ca.m-1)), int)
         V[2**(ca.k**(ca.m-1))-1] = 1
         V = numpy.matrix (V)
         L = []
-        for _ in xrange(N) :
+        for _ in range(N) :
             L.append (V[0,0])
             V = V*M
         #Lf = [float(L[i]/2**i) for i in range(len(L))]  # float GoE density
         return L
-
-# a couple of auxiliary functions
-def int2list (x, r, n) :
-    """
-    Translates number x into a list l of n digits base r (LSB first list).
-    INPUTS:
-        x -- the number to translate
-        r -- base
-        n -- digits
-    OUTPUT:
-        l -- list of digits
-    """
-    l = []
-    for i in xrange(n) : l.append(int(x)%int(r)); x=int(x)/int(r)
-    return l
-
-def list2int (l, r) :
-    """
-    Translates a list l of n digits base r into an integer x (LSB first list).
-    INPUTS:
-        l -- list of digits
-        r -- base
-    OUTPUT:
-        x -- integer
-    """
-    x = 0
-    for i in xrange(len(l)) : x = x + l[i] * r**i
-    return x
-
-def list2bool (l) :
-    for i in xrange(len(l)) : 
-        if (l[i] > 0) : l[i] = 1 
-    return [int(l[i]>0) for i in xrange(len(l))]
 
 
 class lattice () :
@@ -229,7 +197,7 @@ class lattice () :
             elif (type(C) in (str,)) :
                 lt.Cc = numpy.fromstring(C, dtype=dtype)-int(48)
             else :
-                print "Error: incompattible configuration"
+                print("Error: incompattible configuration")
                 return
         elif (lt.ca.d == 1) :
             # 2D CA can be initialized from numpy.ndarray, list of lists or strings, or from images
@@ -243,17 +211,17 @@ class lattice () :
                     for y in range(len(C)) :
                         lt.Cc = numpy.fromstring(C[y], dtype=dtype)-int(48)
                 else :
-                    print "Error: incompattible configuration"
+                    print("Error: incompattible configuration")
                     return
             else :
-                print "Error: incompattible configuration"
+                print("Error: incompattible configuration")
                 return
         else :
             # nD CA where n>2 can only be initialized from numpy.ndarray
             if (type(C) in (numpy.ndarray,)) :
                 lt.Cc = numpy.array(C, dtype=dtype)
             else :
-                print "Error: incompattible configuration"
+                print("Error: incompattible configuration")
                 return
         # an empty array for neighborhoods, can be used for temporal results
         lt.Cn = numpy.empty(lt.N, dtype=dtype)
@@ -261,7 +229,7 @@ class lattice () :
         if (b in ('cyclic', 'open')) :
             lt.b = b
         else :
-            print "Error: currently only 'cyclic' and 'open' boundaries are supported"
+            print("Error: currently only 'cyclic' and 'open' boundaries are supported")
             return
 
     def __repr__(lt):
@@ -270,60 +238,55 @@ class lattice () :
     def next (lt, t=1) :
         """
         Performs a step forward in time, the result is stored back into the
-        configuration 'Cc'. As a partial result the neighborhood configuration is
-        computed an stored into 'Cn'.
+        configuration 'Cc'.
         """
         if (lt.type == '1D') :
             if (lt.b == 'cyclic') :
-                for _ in xrange(t) :
-                    ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                for _ in range(t) :
+                    ca1d.next (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                 shift = t * (-lt.ca.a[0][0])
                 lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
             else :
-                for _ in xrange(t) :
-                    ca1d.ca1d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                for _ in range(t) :
+                    ca1d.next (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                     lt.N = lt.N - (lt.ca.m-1)
                     lt.Cc = lt.Cc[0:lt.N]
         elif ( (lt.type == 'general') & (lt.ca.d == 2)) :
             if (lt.b == 'cyclic') :
-                for _ in xrange(t) :
-                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                for _ in range(t) :
+                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                 shift = t * (-lt.ca.a[0][0])
                 lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
             else :
-                for _ in xrange(t) :
-                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc, lt.Cn)
+                for _ in range(t) :
+                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                     lt.N = lt.N - (lt.ca.m-1)
                     lt.Cc = lt.Cc[0:lt.N]
             
         else :
-            print "Error: feature not yet implemented"
+            print("Error: feature not yet implemented")
         return
 
-    def run (lt, t, out='Cc') :
+    def run (lt, t) :
         if (lt.ca.d == 1) :
            #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.k == 2) ) :
             if (lt.ca.k == 2) :
                 Ct = numpy.empty([t+1, lt.N], dtype='uint8')
-                if   (out == 'Cc') :  Ct [0] = lt.Cc
-                elif (out == 'Cn') :  Ct [0] = lt.Cn
-                else :
-                    print "Error: wrong out parameter"
+                Ct [0] = lt.Cc
                 for y in range(t) :
                     lt.next()
-                    if   (out == 'Cc') :  Ct [y+1] = lt.Cc
-                    elif (out == 'Cn') :  Ct [y+1] = lt.Cn
+                    Ct [y+1] = lt.Cc
         else :
-            print "Error: feature not yet implemented, only 1D CA are supported"
+            print("Error: feature not yet implemented, only 1D CA are supported")
         return Ct
 
     def isGoE (lt) :
         if ((lt.ca.d == 1) and (lt.b == 'open')) :
             s = 2**(lt.ca.k**(lt.ca.m-1))-1
-            for x in xrange(lt.N) : s = lt.ca.Sf[lt.Cc[x]][s];
+            for x in range(lt.N) : s = lt.ca.Sf[lt.Cc[x]][s];
             return (s == 0)
         else :
-            return "Unsupported boundary"
+            return("Unsupported boundary")
 
     def prev (lt) :
         if (lt.ca.d == 1) :
@@ -332,26 +295,26 @@ class lattice () :
 
             if (lt.b == 'cyclic') :
                 lt.D_x_b = [numpy.identity(lt.ca.k**(lt.ca.m-1), dtype="int")]
-                for x in xrange(lt.N) :
+                for x in range(lt.N) :
                     lt.D_x_b.append (lt.ca.D[lt.Cc[lt.N-1-x]] * lt.D_x_b[x])
-                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in xrange(lt.ca.k**(lt.ca.m-1))])
+                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.k**(lt.ca.m-1))])
  
-                C_p = [lattice(lt.ca, lt.N*[0], lt.b) for i in xrange(lt.p)]
+                C_p = [lattice(lt.ca, lt.N*[0], lt.b) for i in range(lt.p)]
                 o_p0 = [];
-                for o in xrange(lt.ca.k**(lt.ca.m-1)) :
-                    o_p0.extend([o for d in xrange(lt.D_x_b[lt.N][o,o])])
+                for o in range(lt.ca.k**(lt.ca.m-1)) :
+                    o_p0.extend([o for d in range(lt.D_x_b[lt.N][o,o])])
                 o_p = list(o_p0)
                
-                for x in xrange(lt.N) :
+                for x in range(lt.N) :
                     i = 0
                     while (i<lt.p) :
                         o_L = o_p[i]; o_R = o_p0[i]
-                        for c in xrange(lt.ca.k) :
+                        for c in range(lt.ca.k) :
                             n = o_L * lt.ca.k + c
                             if (lt.Cc[x] == lt.ca.f[n]) :
                                 o_x = n % (lt.ca.k**(lt.ca.m-1))
                                 p_i = lt.D_x_b[lt.N-x-1][o_x,o_R]
-                                for p_c in xrange(p_i) :
+                                for p_c in range(p_i) :
                                     C_p[i].Cc [(x+lt.ca.sh) % lt.N] = c
                                     o_p[i] = o_x
                                     i = i+1
@@ -366,27 +329,27 @@ class lattice () :
 #                lt.b_x_b = [b_R]
 
                 x = 0
-                for x in xrange(lt.N) :
+                for x in range(lt.N) :
                     lt.b_x_b.append (lt.ca.D[lt.Cc[lt.N-1-x]] * lt.b_x_b[x])
                 lt.p = (b_L * lt.b_x_b[lt.N-1])[0,0]
 
-                C_p = [lattice(lt.ca, (lt.N+lt.ca.m-1)*[0], lt.b) for i in xrange(lt.p)]
+                C_p = [lattice(lt.ca, (lt.N+lt.ca.m-1)*[0], lt.b) for i in range(lt.p)]
                 o_p = [];
-                for o in xrange(lt.ca.k**(lt.ca.m-1)) :
-                    o_p.extend([o for d in xrange(b_L[0,o] * lt.b_x_b[lt.N][o,0])])
-                for i in xrange(lt.p) :
-                    C_p[i].Cc [0:lt.ca.m-1] = int2list(o_p[i], lt.ca.k, lt.ca.m-1)
+                for o in range(lt.ca.k**(lt.ca.m-1)) :
+                    o_p.extend([o for d in range(b_L[0,o] * lt.b_x_b[lt.N][o,0])])
+                for i in range(lt.p) :
+                    C_p[i].Cc [0:lt.ca.m-1] = common.int2list(o_p[i], lt.ca.k, lt.ca.m-1)
 
-                for x in xrange(lt.N) :
+                for x in range(lt.N) :
                     i = 0
                     while (i<lt.p) :
                         o_L = o_p[i];
-                        for c in xrange(lt.ca.k) :
+                        for c in range(lt.ca.k) :
                             n = o_L * lt.ca.k + c
                             if (lt.Cc[x] == lt.ca.f[n]) :
                                 o_x = n % (lt.ca.k**(lt.ca.m-1))
                                 p_i = lt.b_x_b[lt.N-x-1][o_x]
-                                for p_c in xrange(p_i) :
+                                for p_c in range(p_i) :
                                     C_p[i].Cc [x+lt.ca.m-1] = c
                                     o_p[i] = o_x
                                     i = i+1
@@ -394,4 +357,4 @@ class lattice () :
                 return C_p
 
             else :
-                print "Error: there is no preimage implementation for automata with more than 1 dimensions." 
+                print("Error: there is no preimage implementation for automata with more than 1 dimensions.")
