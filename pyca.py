@@ -61,12 +61,12 @@ ca_neighborhood_by_name = {
 
 class rule (object) :
     """
-    A CA rule is a tuple defined by three parameters (k, m, r).
+    A CA rule is a tuple defined by three parameters (stateset, neighborhood, rule).
     
     INPUTS:
-        k  -- number of states per cell
-        a  -- neighborhood (a list of cell coordinates)
-        r  -- rule number
+        stateset     -- number of states per cell
+        neighborhood -- a list of cell coordinates
+        rule         -- rule number
 
     INTERNALS:
         m  -- neighborhood size (number of cells composing a neighborhood)
@@ -77,63 +77,63 @@ class rule (object) :
         Sb -- backward state machine
     """
 
-    def __init__(ca, k, a, r):
-        ca.k = k
-        ca.a = a
-        ca.r = r
+    def __init__(ca, stateset, neighborhood, rule):
+        ca.stateset     = stateset
+        ca.neighborhood = neighborhood
+        ca.rule         = rule
 
     def __repr__(ca):
-        return "Cellular Automaton (states = "+str(ca.k)+", neighborhood = "+str(ca.a)+", rule = "+str(ca.r)+")"
+        return "Cellular Automaton (stateset = "+str(ca.stateset)+", neighborhood = "+str(ca.neighborhood)+", rule = "+str(ca.rule)+")"
 
     def get_a (ca) :
-        return ca.__a
-    def set_a (ca, a) :
+        return ca.__neighborhood
+    def set_a (ca, neighborhood) :
         # the neighborhood is provided by its common name
-        if (type(a) is str) :
+        if (type(neighborhood) is str) :
             try :
-                ca.__a = ca_neighborhood_by_name [a]
+                ca.__neighborhood = ca_neighborhood_by_name [neighborhood]
             except KeyError :
                 print("Error: unsupported neighborhood name")
                 return
         # check if the neighborhood is a tuple, otherwise translate it
         else :
-            if ( (type(a   ) not in (tuple,)) or
-                 (type(a[0]) not in (tuple,)) ) :
-                if (type(a[0]) in (list,)) :
-                    ca.__a = tuple([tuple( x ) for x in a])
+            if ( (type(neighborhood   ) not in (tuple,)) or
+                 (type(neighborhood[0]) not in (tuple,)) ) :
+                if (type(neighborhood[0]) in (list,)) :
+                    ca.__neighborhood = tuple([tuple( x ) for x in neighborhood])
                 else :
-                    ca.__a = tuple([tuple([x]) for x in a])
+                    ca.__neighborhood = tuple([tuple([x]) for x in neighborhood])
         # set neighborhood related parameters
-        ca.m = len(ca.__a)
-        ca.d = len(ca.__a[0])
-        ca.sh = -ca.__a[0][0]
+        ca.m = len(ca.__neighborhood)
+        ca.d = len(ca.__neighborhood[0])
+        ca.sh = -ca.__neighborhood[0][0]
     a = property(get_a, set_a)
 
     def get_r (ca) :
-        return ca.__r
-    def set_r (ca, r) :
-        ca.__r = r
+        return ca.__rule
+    def set_r (ca, rule) :
+        ca.__rule = rule
         # build transition lookup table
-        ca.f = numpy.array([ca.r // ca.k**n % ca.k for n in range(ca.k**ca.m)], dtype='uint8')
+        ca.f = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in range(ca.stateset**ca.m)], dtype='uint8')
         # for 1D CA some rule properties can be computed
         if (ca.d == 1) :
-            ca.D = [numpy.mat (numpy.zeros ((ca.k**(ca.m-1), ca.k**(ca.m-1)), int)) for k in range(ca.k)]
-            for n in range(ca.k**ca.m) :
-                o_l = n // ca.k; o_r = n % (ca.k**(ca.m-1))
+            ca.D = [numpy.mat (numpy.zeros ((ca.stateset**(ca.m-1), ca.stateset**(ca.m-1)), int)) for k in range(ca.stateset)]
+            for n in range(ca.stateset**ca.m) :
+                o_l = n // ca.stateset; o_r = n % (ca.stateset**(ca.m-1))
                 ca.D [ca.f[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.k, ca.k**(ca.m-1))) * ca.D[c])[0]), ca.k) for i in range(2**(ca.k**(ca.m-1))) ] for c in range(ca.k) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.D[c] * numpy.mat(common.int2list(i, ca.k, ca.k**(ca.m-1))))[0]), ca.k) for i in range(2**(ca.k**(ca.m-1))) ] for c in range(ca.k) ]
+        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.m-1))) * ca.D[c])[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.m-1))) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.D[c] * numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.m-1))))[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.m-1))) ] for c in range(ca.stateset) ]
     r = property(get_r, set_r)
 
     def GoE_count(ca, N) :
-        M = numpy.zeros ((2**(ca.k**(ca.m-1)), 2**(ca.k**(ca.m-1))), int)
-        for c in range(ca.k) :
-            for i in range(2**(ca.k**(ca.m-1))) :
+        M = numpy.zeros ((2**(ca.stateset**(ca.m-1)), 2**(ca.stateset**(ca.m-1))), int)
+        for c in range(ca.stateset) :
+            for i in range(2**(ca.stateset**(ca.m-1))) :
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
         M = numpy.matrix (M)
-        V = numpy.zeros (2**(ca.k**(ca.m-1)), int)
-        V[2**(ca.k**(ca.m-1))-1] = 1
+        V = numpy.zeros (2**(ca.stateset**(ca.m-1)), int)
+        V[2**(ca.stateset**(ca.m-1))-1] = 1
         V = numpy.matrix (V)
         L = []
         for _ in range(N) :
@@ -185,7 +185,7 @@ class lattice () :
         lt.ca = ca
         lt.N  = len(C)
         # detecting the CA type
-        if ( (lt.ca.d==1) & (lt.ca.a == tuple([tuple([x+lt.ca.a[0][0]]) for x in range(lt.ca.m)])) ) :
+        if ( (lt.ca.d==1) & (lt.ca.neighborhood == tuple([tuple([x+lt.ca.neighborhood[0][0]]) for x in range(lt.ca.m)])) ) :
             lt.type = '1D'
         else :
             lt.type = 'general'
@@ -243,23 +243,23 @@ class lattice () :
         if (lt.type == '1D') :
             if (lt.b == 'cyclic') :
                 for _ in range(t) :
-                    ca1d.next (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
-                shift = t * (-lt.ca.a[0][0])
+                    ca1d.next (lt.ca.stateset, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
+                shift = t * (-lt.ca.neighborhood[0][0])
                 lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
             else :
                 for _ in range(t) :
-                    ca1d.next (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
+                    ca1d.next (lt.ca.stateset, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                     lt.N = lt.N - (lt.ca.m-1)
                     lt.Cc = lt.Cc[0:lt.N]
         elif ( (lt.type == 'general') & (lt.ca.d == 2)) :
             if (lt.b == 'cyclic') :
                 for _ in range(t) :
-                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
-                shift = t * (-lt.ca.a[0][0])
+                    ca2d.ca2d_next_generic (lt.ca.stateset, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
+                shift = t * (-lt.ca.neighborhood[0][0])
                 lt.Cc = numpy.concatenate((lt.Cc[lt.N-shift:lt.N], lt.Cc[0:lt.N-shift]), axis=0)
             else :
                 for _ in range(t) :
-                    ca2d.ca2d_next_generic (lt.ca.k, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
+                    ca2d.ca2d_next_generic (lt.ca.stateset, lt.ca.m, lt.ca.f, lt.N, lt.Cc)
                     lt.N = lt.N - (lt.ca.m-1)
                     lt.Cc = lt.Cc[0:lt.N]
             
@@ -269,8 +269,8 @@ class lattice () :
 
     def run (lt, t) :
         if (lt.ca.d == 1) :
-           #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.k == 2) ) :
-            if (lt.ca.k == 2) :
+           #if ( (lt.Cc.dtype in (dtype('uint8'),)) and (lt.ca.stateset == 2) ) :
+            if (lt.ca.stateset == 2) :
                 Ct = numpy.empty([t+1, lt.N], dtype='uint8')
                 Ct [0] = lt.Cc
                 for y in range(t) :
@@ -282,7 +282,7 @@ class lattice () :
 
     def isGoE (lt) :
         if ((lt.ca.d == 1) and (lt.b == 'open')) :
-            s = 2**(lt.ca.k**(lt.ca.m-1))-1
+            s = 2**(lt.ca.stateset**(lt.ca.m-1))-1
             for x in range(lt.N) : s = lt.ca.Sf[lt.Cc[x]][s];
             return (s == 0)
         else :
@@ -294,14 +294,14 @@ class lattice () :
             C_p = []
 
             if (lt.b == 'cyclic') :
-                lt.D_x_b = [numpy.identity(lt.ca.k**(lt.ca.m-1), dtype="int")]
+                lt.D_x_b = [numpy.identity(lt.ca.stateset**(lt.ca.m-1), dtype="int")]
                 for x in range(lt.N) :
                     lt.D_x_b.append (lt.ca.D[lt.Cc[lt.N-1-x]] * lt.D_x_b[x])
-                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.k**(lt.ca.m-1))])
+                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.stateset**(lt.ca.m-1))])
  
                 C_p = [lattice(lt.ca, lt.N*[0], lt.b) for i in range(lt.p)]
                 o_p0 = [];
-                for o in range(lt.ca.k**(lt.ca.m-1)) :
+                for o in range(lt.ca.stateset**(lt.ca.m-1)) :
                     o_p0.extend([o for d in range(lt.D_x_b[lt.N][o,o])])
                 o_p = list(o_p0)
                
@@ -309,10 +309,10 @@ class lattice () :
                     i = 0
                     while (i<lt.p) :
                         o_L = o_p[i]; o_R = o_p0[i]
-                        for c in range(lt.ca.k) :
-                            n = o_L * lt.ca.k + c
+                        for c in range(lt.ca.stateset) :
+                            n = o_L * lt.ca.stateset + c
                             if (lt.Cc[x] == lt.ca.f[n]) :
-                                o_x = n % (lt.ca.k**(lt.ca.m-1))
+                                o_x = n % (lt.ca.stateset**(lt.ca.m-1))
                                 p_i = lt.D_x_b[lt.N-x-1][o_x,o_R]
                                 for p_c in range(p_i) :
                                     C_p[i].Cc [(x+lt.ca.sh) % lt.N] = c
@@ -322,7 +322,7 @@ class lattice () :
                 return C_p
 
             elif (lt.b == 'open') :
-                b_L = b_R = numpy.matrix((lt.ca.k**(lt.ca.m-1))*[1])
+                b_L = b_R = numpy.matrix((lt.ca.stateset**(lt.ca.m-1))*[1])
                 lt.b_x_b = [b_R.T]
 #              else :
 #                b_L = (lt.b[0]); b_R = vector(lt.b[1])
@@ -335,19 +335,19 @@ class lattice () :
 
                 C_p = [lattice(lt.ca, (lt.N+lt.ca.m-1)*[0], lt.b) for i in range(lt.p)]
                 o_p = [];
-                for o in range(lt.ca.k**(lt.ca.m-1)) :
+                for o in range(lt.ca.stateset**(lt.ca.m-1)) :
                     o_p.extend([o for d in range(b_L[0,o] * lt.b_x_b[lt.N][o,0])])
                 for i in range(lt.p) :
-                    C_p[i].Cc [0:lt.ca.m-1] = common.int2list(o_p[i], lt.ca.k, lt.ca.m-1)
+                    C_p[i].Cc [0:lt.ca.m-1] = common.int2list(o_p[i], lt.ca.stateset, lt.ca.m-1)
 
                 for x in range(lt.N) :
                     i = 0
                     while (i<lt.p) :
                         o_L = o_p[i];
-                        for c in range(lt.ca.k) :
-                            n = o_L * lt.ca.k + c
+                        for c in range(lt.ca.stateset) :
+                            n = o_L * lt.ca.stateset + c
                             if (lt.Cc[x] == lt.ca.f[n]) :
-                                o_x = n % (lt.ca.k**(lt.ca.m-1))
+                                o_x = n % (lt.ca.stateset**(lt.ca.m-1))
                                 p_i = lt.b_x_b[lt.N-x-1][o_x]
                                 for p_c in range(p_i) :
                                     C_p[i].Cc [x+lt.ca.m-1] = c
