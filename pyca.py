@@ -125,14 +125,14 @@ class rule(object):
         ca.transition_table = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in range(ca.stateset**ca.size)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
-            ca.de_Bruijn_matrices = [numpy.mat (numpy.zeros ((ca.stateset**(ca.size-1), ca.stateset**(ca.size-1)), int)) for k in range(ca.stateset)]
+            ca.de_Bruijn = [numpy.mat (numpy.zeros ((ca.stateset**(ca.size-1), ca.stateset**(ca.size-1)), numpy.uint)) for k in range(ca.stateset)]
             for n in range(ca.stateset**ca.size):
                 o_l = n // ca.stateset
                 o_r = n % (ca.stateset**(ca.size-1))
-                ca.de_Bruijn_matrices [ca.transition_table[n]] [o_l, o_r] = 1
+                ca.de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))) * ca.de_Bruijn_matrices[c])[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.de_Bruijn_matrices[c] * numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))))[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
+        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.de_Bruijn[c] * numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))))[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
 
     rule = property(get_rule, set_rule)
 
@@ -202,8 +202,7 @@ class lattice():
     computes a list of preimages, the results depends on the boundary type.
     """
     def __init__(lt, ca, configuration, boundary='cyclic'):
-        lt.ca = ca
-        lt.N  = len(configuration)
+        lt.ca    = ca
         # detecting the CA type
         if (lt.ca.dimensions==1):
             lt.type = '1D'
@@ -227,7 +226,7 @@ class lattice():
                 if (type(configuration[0]) in (list,)):
                     lt.configuration = numpy.array(configuration, dtype=ca.dtype)
                 elif (type(configuration) in (string,)):
-                    lt.configuration = numpy.empty(lt.N, dtype=ca.type)
+                    lt.configuration = numpy.empty(len(configuration), dtype=ca.type)
                     for y in range(len(configuration)):
                         lt.configuration = numpy.fromstring(configuration[y], dtype=ca.dtype) - ca.dtype(48)
                 else:
@@ -243,8 +242,9 @@ class lattice():
             else:
                 print("Error: incompattible nD configuration")
                 return
+        lt.shape = lt.configuration.shape
         # an empty array for neighborhoods, can be used for temporal results
-        lt.Cn = numpy.empty(lt.N, dtype=ca.dtype)
+        lt.Cn = numpy.empty(lt.shape, dtype=ca.dtype)
         # parsing the input boundary
         if (boundary in ('cyclic', 'open')):
             lt.boundary = boundary
@@ -262,16 +262,16 @@ class lattice():
         """
         if (lt.boundary == 'cyclic'):
             # calculate temporary neighborhoods array
-            neighborhoods = numpy.zeros(lt.N, dtype=numpy.uint)
-            for i in range(lt.N):
-#                print(numpy.mod(lt.ca.index + [[i]], lt.N))
-                neighborhood = lt.configuration[numpy.mod(lt.ca.index + [[i]], lt.N)][0]
+            neighborhoods = numpy.zeros(lt.configuration.shape, dtype=numpy.uint)
+            for i in numpy.ndindex(lt.shape):
+#                print(numpy.mod(lt.ca.index + [[i]], lt.shape))
+                neighborhood = lt.configuration[numpy.mod(lt.ca.index + [[i]], lt.shape[0])][0]
 #                print(neighborhood)
                 neighborhoods[i] = lt.ca.neighborhood_to_number(neighborhood)
 #            print(neighborhoods)
             # calculate next configuration from neighborhoods
             # TODO: do not use a for loop for speed, and modify in place
-            for i in range(lt.N):
+            for i in numpy.ndindex(lt.shape):
                 lt.configuration[i] = lt.ca.transition_table[neighborhoods[i]]
         else:
             print("ERROR: boundary type not supported.")
@@ -292,7 +292,7 @@ class lattice():
             if (lt.boundary == 'cyclic') :
                 lt.D_x_b = [numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype="int")]
                 for x in range(lt.N) :
-                    lt.D_x_b.append (lt.ca.de_Bruijn_matrices[lt.configuration[lt.N-1-x]] * lt.D_x_b[x])
+                    lt.D_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.D_x_b[x])
                 lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.stateset**(lt.ca.size-1))])
  
                 C_p = [lattice(lt.ca, lt.N*[0], lt.boundary) for i in range(lt.p)]
@@ -326,7 +326,7 @@ class lattice():
 
                 x = 0
                 for x in range(lt.N) :
-                    lt.boundary_x_b.append (lt.ca.de_Bruijn_matrices[lt.configuration[lt.N-1-x]] * lt.boundary_x_b[x])
+                    lt.boundary_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.boundary_x_b[x])
                 lt.p = (b_L * lt.boundary_x_b[lt.N-1])[0,0]
 
                 C_p = [lattice(lt.ca, (lt.N+lt.ca.size-1)*[0], lt.boundary) for i in range(lt.p)]
