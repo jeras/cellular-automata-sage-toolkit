@@ -90,7 +90,7 @@ class rule(object):
         ca.rule         = rule
 
     def __repr__(ca):
-        return "Cellular Automaton (stateset = "+str(ca.stateset)+", neighborhood = "+str(ca.neighborhood)+", rule = "+str(ca.rule)+", dtype = "+str(ca.dtype)+")"
+        return "Cellular Automaton (stateset = "+str(ca.stateset)+", neighborhood = "+str(ca.neighborhood)+", rule = "+str(ca.rule)+", dtype = "+repr(ca.dtype)+")"
 
     def get_neighborhood(ca):
         return ca.__neighborhood
@@ -125,7 +125,7 @@ class rule(object):
         ca.transition_table = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in range(ca.stateset**ca.size)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
-            ca.de_Bruijn = [numpy.mat (numpy.zeros ((ca.stateset**(ca.size-1), ca.stateset**(ca.size-1)), numpy.uint)) for k in range(ca.stateset)]
+            ca.de_Bruijn = [numpy.matrix(numpy.zeros ((ca.stateset**(ca.size-1), ca.stateset**(ca.size-1)), numpy.uint)) for k in range(ca.stateset)]
             for n in range(ca.stateset**ca.size):
                 o_l = n // ca.stateset
                 o_r = n % (ca.stateset**(ca.size-1))
@@ -284,14 +284,46 @@ class lattice():
         else :
             return("Unsupported boundary")
 
+    def repr_preimage_vector(lt, pv):
+        return repr(pv)
+
+    def repr_preimage_vector_array(lt, pva):
+        return repr(pva)
+
+    def preimage_vector_array_forward(lt, boundary_vector = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            D = [numpy.matrix(numpy.empty(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint), copy=False) for _ in range(N+1)]
+            if (boundary_vector == None):
+                D[0] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
+            else:
+                D[0] = boundary_vector
+            for x in range(N):
+                D[x+1] = D[x] * lt.ca.de_Bruijn[lt.configuration[x]]
+            return D
+        else:
+            print("ERROR: only 1D CA supported")
+
+    def preimage_vector_array_backward(lt, boundary_vector = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            D = [numpy.matrix(numpy.empty(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint), copy=False) for _ in range(N+1)]
+            if (boundary_vector == None):
+                D[N] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
+            else:
+                D[N] = boundary_vector
+            for x in range(N, 0, -1):
+                D[x-1] = (lt.ca.de_Bruijn[lt.configuration[x-1]] * D[x].T).T
+            return D
+        else:
+            print("ERROR: only 1D CA supported")
+
     def prev(lt):
         if (lt.ca.dimensions == 1):
-         
-            C_p = []
 
-            if (lt.boundary == 'cyclic') :
-                lt.D_x_b = [numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype="int")]
-                for x in range(lt.N) :
+            if (lt.boundary == 'cyclic'):
+                lt.D_x_b = []
+                for x in range(lt.shape[0]):
                     lt.D_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.D_x_b[x])
                 lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.stateset**(lt.ca.size-1))])
  
