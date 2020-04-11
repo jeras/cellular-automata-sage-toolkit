@@ -293,7 +293,7 @@ class lattice():
     def preimage_vector_array_forward(lt, boundary_vector = None):
         if (lt.ca.dimensions == 1):
             N = lt.shape[0]
-            D = [numpy.matrix(numpy.empty(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint), copy=False) for _ in range(N+1)]
+            D = [None] * (N+1)
             if (boundary_vector == None):
                 D[0] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
             else:
@@ -307,7 +307,7 @@ class lattice():
     def preimage_vector_array_backward(lt, boundary_vector = None):
         if (lt.ca.dimensions == 1):
             N = lt.shape[0]
-            D = [numpy.matrix(numpy.empty(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint), copy=False) for _ in range(N+1)]
+            D = [None] * (N+1)
             if (boundary_vector == None):
                 D[N] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
             else:
@@ -317,6 +317,63 @@ class lattice():
             return D
         else:
             print("ERROR: only 1D CA supported")
+
+    def preimage_vector_array(lt, boundary_vector_left = None, boundary_vector_right = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            Df = lt.preimage_vector_array_forward (boundary_vector = boundary_vector_left )
+            Db = lt.preimage_vector_array_backward(boundary_vector = boundary_vector_right)
+            D = [None] * (N+1)
+            for x in range(N+1):
+                # Hadamard product
+                D[x] = numpy.matrix(numpy.multiply(Df[x], Db[x]))
+            return D
+        else:
+            print("ERROR: only 1D CA supported")
+
+
+    def preimage_matrix_array_forward(lt, boundary_matrix = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            M = [None] * (N+1)
+            if (boundary_matrix == None):
+                M[0] = numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint)
+            else:
+                M[0] = boundary_matrix
+            for x in range(N):
+                M[x+1] = M[x] * lt.ca.de_Bruijn[lt.configuration[x]]
+            return M
+        else:
+            print("ERROR: only 1D CA supported")
+
+    def preimage_matrix_array_backward(lt, boundary_matrix = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            M = [None] * (N+1)
+            if (boundary_matrix == None):
+                M[N] = numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint)
+            else:
+                M[N] = boundary_matrix
+            for x in range(N, 0, -1):
+                M[x-1] = lt.ca.de_Bruijn[lt.configuration[x-1]] * M[x]
+            return M
+        else:
+            print("ERROR: only 1D CA supported")
+
+    def preimage_matrix_array(lt, boundary_matrix_left = None, boundary_matrix_right = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            Mf = lt.preimage_matrix_array_forward (boundary_matrix = boundary_matrix_left )
+            Mb = lt.preimage_matrix_array_backward(boundary_matrix = boundary_matrix_right)
+            M = [None] * (N+1)
+            for x in range(N+1):
+                # Hadamard product
+                # TODO: should the result be just a vector?
+                M[x] = numpy.matrix(numpy.multiply(Mf[x], Mb[x].T))
+            return M
+        else:
+            print("ERROR: only 1D CA supported")
+
 
     def prev(lt):
         if (lt.ca.dimensions == 1):
