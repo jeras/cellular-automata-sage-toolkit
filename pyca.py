@@ -85,7 +85,7 @@ class rule(object):
 
     def __init__(ca, stateset, neighborhood, rule, dtype=numpy.uint8):
         ca.dtype        = dtype
-        ca.stateset     = stateset
+        ca.stateset     = numpy.uint(stateset)
         ca.neighborhood = neighborhood
         ca.rule         = rule
 
@@ -106,13 +106,15 @@ class rule(object):
         # translate neighborhood into numpy ndarray
         ca.__neighborhood = numpy.array(neighborhood, dtype=numpy.int)
         # number of cells composing a neighborhood
-        ca.size       = ca.__neighborhood.shape[0]
+        ca.size       = numpy.uint(ca.__neighborhood.shape[0])
         # number of dimmensions
         ca.dimensions = ca.__neighborhood.shape[1]
         # weights for conversion between neighborhood and cell
         ca.weights    = ca.stateset ** numpy.flip(numpy.arange(ca.size))
         # neighborhood index array
         ca.index      = numpy.swapaxes(ca.__neighborhood,0,1)
+        # size of the overlap set
+        ca.overlapset = ca.stateset**(ca.size-numpy.uint(1))
 
     neighborhood = property(get_neighborhood, set_neighborhood)
 
@@ -122,17 +124,17 @@ class rule(object):
     def set_rule(ca, rule):
         ca.__rule = rule
         # build transition lookup table
-        ca.transition_table = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in range(ca.stateset**ca.size)], dtype=ca.dtype)
+        ca.transition_table = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in numpy.arange(ca.stateset**ca.size, dtype=numpy.uint)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
-            ca.de_Bruijn = [numpy.matrix(numpy.zeros ((ca.stateset**(ca.size-1), ca.stateset**(ca.size-1)), numpy.uint)) for k in range(ca.stateset)]
-            for n in range(ca.stateset**ca.size):
+            ca.de_Bruijn = [numpy.matrix(numpy.zeros ((ca.overlapset, ca.overlapset), numpy.uint)) for k in range(ca.stateset)]
+            for n in numpy.arange(ca.stateset**ca.size, dtype=numpy.uint):
                 o_l = n // ca.stateset
-                o_r = n % (ca.stateset**(ca.size-1))
+                o_r = n % (ca.overlapset)
                 ca.de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.de_Bruijn[c] * numpy.mat(common.int2list(i, ca.stateset, ca.stateset**(ca.size-1))))[0]), ca.stateset) for i in range(2**(ca.stateset**(ca.size-1))) ] for c in range(ca.stateset) ]
+        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(numpy.uint(2)**ca.overlapset) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.de_Bruijn[c] * numpy.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(2**(ca.overlapset)) ] for c in range(ca.stateset) ]
 
     rule = property(get_rule, set_rule)
 
@@ -147,13 +149,13 @@ class rule(object):
         return neighborhood_array
     
     def GoE_count(ca, N):
-        M = numpy.zeros ((2**(ca.stateset**(ca.size-1)), 2**(ca.stateset**(ca.size-1))), int)
+        M = numpy.zeros ((2**(ca.overlapset), 2**(ca.overlapset)), int)
         for c in range(ca.stateset):
-            for i in range(2**(ca.stateset**(ca.size-1))):
+            for i in range(2**(ca.overlapset)):
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
         M = numpy.matrix (M)
-        V = numpy.zeros (2**(ca.stateset**(ca.size-1)), int)
-        V[2**(ca.stateset**(ca.size-1))-1] = 1
+        V = numpy.zeros (2**(ca.overlapset), int)
+        V[2**(ca.overlapset)-1] = 1
         V = numpy.matrix (V)
         L = []
         for _ in range(N) :
@@ -278,7 +280,7 @@ class lattice():
 
     def isGoE(lt):
         if ((lt.ca.dimensions == 1) and (lt.boundary == 'open')) :
-            s = 2**(lt.ca.stateset**(lt.ca.size-1))-1
+            s = 2**(lt.ca.overlapset)-1
             for x in range(lt.N) : s = lt.ca.Sf[lt.configuration[x]][s];
             return (s == 0)
         else :
@@ -295,7 +297,7 @@ class lattice():
             N = lt.shape[0]
             D = [None] * (N+1)
             if (boundary_vector == None):
-                D[0] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
+                D[0] = numpy.matrix(numpy.ones(lt.ca.overlapset, dtype=numpy.uint))
             else:
                 D[0] = boundary_vector
             for x in range(N):
@@ -309,9 +311,9 @@ class lattice():
             N = lt.shape[0]
             D = [None] * (N+1)
             if (boundary_vector == None):
-                D[N] = numpy.matrix(numpy.ones(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint))
+                D[-1] = numpy.matrix(numpy.ones(lt.ca.overlapset, dtype=numpy.uint))
             else:
-                D[N] = boundary_vector
+                D[-1] = boundary_vector
             for x in range(N, 0, -1):
                 D[x-1] = (lt.ca.de_Bruijn[lt.configuration[x-1]] * D[x].T).T
             return D
@@ -337,9 +339,9 @@ class lattice():
             N = lt.shape[0]
             M = [None] * (N+1)
             if (boundary_matrix == None):
-                M[0] = numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint)
+                M[0] = numpy.matrix(numpy.identity(int(lt.ca.overlapset), dtype=numpy.uint))
             else:
-                M[0] = boundary_matrix
+                M[0] = numpy.matrix(boundary_matrix)
             for x in range(N):
                 M[x+1] = M[x] * lt.ca.de_Bruijn[lt.configuration[x]]
             return M
@@ -351,9 +353,9 @@ class lattice():
             N = lt.shape[0]
             M = [None] * (N+1)
             if (boundary_matrix == None):
-                M[N] = numpy.identity(lt.ca.stateset**(lt.ca.size-1), dtype=numpy.uint)
+                M[-1] = numpy.matrix(numpy.identity(int(lt.ca.overlapset), dtype=numpy.uint))
             else:
-                M[N] = boundary_matrix
+                M[-1] = numpy.matrix(boundary_matrix)
             for x in range(N, 0, -1):
                 M[x-1] = lt.ca.de_Bruijn[lt.configuration[x-1]] * M[x]
             return M
@@ -377,37 +379,36 @@ class lattice():
 
     def prev(lt):
         if (lt.ca.dimensions == 1):
+            N = numpy.uint(lt.shape[0])
 
             if (lt.boundary == 'cyclic'):
-                lt.D_x_b = []
-                for x in range(lt.shape[0]):
-                    lt.D_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.D_x_b[x])
-                lt.p = sum ([lt.D_x_b [lt.N] [i,i] for i in range(lt.ca.stateset**(lt.ca.size-1))])
+                Db = lt.preimage_matrix_array_backward()
+                p = Db[0].trace()[0,0]
  
-                C_p = [lattice(lt.ca, lt.N*[0], lt.boundary) for i in range(lt.p)]
-                o_p0 = [];
-                for o in range(lt.ca.stateset**(lt.ca.size-1)) :
-                    o_p0.extend([o for d in range(lt.D_x_b[lt.N][o,o])])
-                o_p = list(o_p0)
+                C_p = numpy.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
+                o_p0 = numpy.arange(lt.ca.overlapset, dtype=numpy.uint).repeat(Db[0].diagonal().A1.astype(numpy.int))
+                o_p = o_p0
+                print(o_p)
                
-                for x in range(lt.N) :
+                for x in numpy.arange(N, dtype=numpy.uint) :
                     i = 0
-                    while (i<lt.p) :
+                    while (i<p) :
                         o_L = o_p[i]; o_R = o_p0[i]
-                        for c in range(lt.ca.stateset) :
+                        for c in numpy.arange(lt.ca.stateset, dtype=numpy.uint) :
                             n = o_L * lt.ca.stateset + c
+                            print(n, type(o_L), type(lt.ca.stateset), type(c))
                             if (lt.configuration[x] == lt.ca.transition_table[n]) :
-                                o_x = n % (lt.ca.stateset**(lt.ca.size-1))
-                                p_i = lt.D_x_b[lt.N-x-1][o_x,o_R]
+                                o_x = n % (lt.ca.overlapset)
+                                p_i = Db[x][o_x,o_R]
                                 for p_c in range(p_i) :
-                                    C_p[i].Cc [(x+lt.ca.sh) % lt.N] = c
+                                    C_p[i][x % N] = c
                                     o_p[i] = o_x
                                     i = i+1
 
                 return C_p
 
             elif (lt.boundary == 'open') :
-                b_L = b_R = numpy.matrix((lt.ca.stateset**(lt.ca.size-1))*[1])
+                b_L = b_R = numpy.matrix((lt.ca.overlapset)*[1])
                 lt.boundary_x_b = [b_R.T]
 #              else :
 #                b_L = (lt.boundary[0]); b_R = vector(lt.boundary[1])
@@ -420,7 +421,7 @@ class lattice():
 
                 C_p = [lattice(lt.ca, (lt.N+lt.ca.size-1)*[0], lt.boundary) for i in range(lt.p)]
                 o_p = [];
-                for o in range(lt.ca.stateset**(lt.ca.size-1)) :
+                for o in range(lt.ca.overlapset) :
                     o_p.extend([o for d in range(b_L[0,o] * lt.boundary_x_b[lt.N][o,0])])
                 for i in range(lt.p) :
                     C_p[i].Cc [0:lt.ca.size-1] = common.int2list(o_p[i], lt.ca.stateset, lt.ca.size-1)
@@ -432,7 +433,7 @@ class lattice():
                         for c in range(lt.ca.stateset) :
                             n = o_L * lt.ca.stateset + c
                             if (lt.configuration[x] == lt.ca.transition_table[n]) :
-                                o_x = n % (lt.ca.stateset**(lt.ca.size-1))
+                                o_x = n % (lt.ca.overlapset)
                                 p_i = lt.boundary_x_b[lt.N-x-1][o_x]
                                 for p_c in range(p_i) :
                                     C_p[i].Cc [x+lt.ca.size-1] = c
