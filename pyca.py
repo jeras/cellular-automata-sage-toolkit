@@ -103,7 +103,7 @@ class rule(object):
                 print("Error: unsupported neighborhood name")
                 return
         # translate neighborhood into numpy ndarray
-        ca.__neighborhood = np.array(neighborhood, dtype=np.int)
+        ca.__neighborhood = np.array(neighborhood, dtype=np.intp)
         # number of cells composing a neighborhood
         ca.size       = np.uint(ca.__neighborhood.shape[0])
         # number of dimmensions
@@ -114,6 +114,8 @@ class rule(object):
         ca.index      = np.swapaxes(ca.__neighborhood,0,1)
         # size of the overlap set
         ca.overlapset = ca.stateset**(ca.size-np.uint(1))
+        # size of subset diagram
+        ca.subset     = np.intp(2)**ca.stateset
 
     neighborhood = property(get_neighborhood, set_neighborhood)
 
@@ -132,8 +134,8 @@ class rule(object):
                 o_r = n % (ca.overlapset)
                 ca.de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(np.uint(2)**ca.overlapset) ] for c in range(ca.stateset) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(2**(ca.overlapset)) ] for c in range(ca.stateset) ]
+       #ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(ca.subset) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(ca.subset)) ] for c in range(ca.stateset) ]
 
     rule = property(get_rule, set_rule)
 
@@ -148,13 +150,13 @@ class rule(object):
         return neighborhood_array
     
     def GoE_count(ca, N):
-        M = np.zeros ((2**(ca.overlapset), 2**(ca.overlapset)), int)
+        M = np.zeros ((ca.subset, ca.subset), int)
         for c in range(ca.stateset):
-            for i in range(2**(ca.overlapset)):
+            for i in range(ca.subset):
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
         M = np.matrix (M)
-        V = np.zeros (2**(ca.overlapset), int)
-        V[2**(ca.overlapset)-1] = 1
+        V = np.zeros (ca.subset, int)
+        V[ca.subset-1] = 1
         V = np.matrix (V)
         L = []
         for _ in range(N) :
@@ -279,7 +281,7 @@ class lattice():
 
     def isGoE(lt):
         if ((lt.ca.dimensions == 1) and (lt.boundary == 'open')) :
-            s = 2**(lt.ca.overlapset)-1
+            s = lt.ca.subset-1
             for x in range(lt.N) : s = lt.ca.Sf[lt.configuration[x]][s];
             return (s == 0)
         else :
