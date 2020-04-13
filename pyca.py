@@ -39,15 +39,14 @@ EXAMPLES:
     cells with random value, the preciously defined rule 110 CA is used.
     The output image is stored into a local file "rule110_rqndom.png"
 
-    sage: import numpy, ca_vizual
-    sage: lt = pyca.lattice (ca, numpy.random.random_integers(0,1,(1024)))
+    sage: import numpy as np
+    sage: import ca_vizual
+    sage: lt = pyca.lattice (ca, np.random.random_integers(0,1,(1024)))
     sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
 
 #import sage
-import numpy
-import pyca_1d     as ca1d
-import pyca_common as common
+import numpy       as np
 #import ca_vizual
 
 ca_neighborhood_by_name = {
@@ -83,9 +82,9 @@ class rule(object):
         Sb -- backward state machine
     """
 
-    def __init__(ca, stateset, neighborhood, rule, dtype=numpy.uint8):
+    def __init__(ca, stateset, neighborhood, rule, dtype=np.uint8):
         ca.dtype        = dtype
-        ca.stateset     = numpy.uint(stateset)
+        ca.stateset     = np.uint(stateset)
         ca.neighborhood = neighborhood
         ca.rule         = rule
 
@@ -104,17 +103,17 @@ class rule(object):
                 print("Error: unsupported neighborhood name")
                 return
         # translate neighborhood into numpy ndarray
-        ca.__neighborhood = numpy.array(neighborhood, dtype=numpy.int)
+        ca.__neighborhood = np.array(neighborhood, dtype=np.int)
         # number of cells composing a neighborhood
-        ca.size       = numpy.uint(ca.__neighborhood.shape[0])
+        ca.size       = np.uint(ca.__neighborhood.shape[0])
         # number of dimmensions
         ca.dimensions = ca.__neighborhood.shape[1]
         # weights for conversion between neighborhood and cell
-        ca.weights    = ca.stateset ** numpy.flip(numpy.arange(ca.size))
+        ca.weights    = ca.stateset ** np.flip(np.arange(ca.size))
         # neighborhood index array
-        ca.index      = numpy.swapaxes(ca.__neighborhood,0,1)
+        ca.index      = np.swapaxes(ca.__neighborhood,0,1)
         # size of the overlap set
-        ca.overlapset = ca.stateset**(ca.size-numpy.uint(1))
+        ca.overlapset = ca.stateset**(ca.size-np.uint(1))
 
     neighborhood = property(get_neighborhood, set_neighborhood)
 
@@ -124,39 +123,39 @@ class rule(object):
     def set_rule(ca, rule):
         ca.__rule = rule
         # build transition lookup table
-        ca.transition_table = numpy.array([ca.rule // ca.stateset**n % ca.stateset for n in numpy.arange(ca.stateset**ca.size, dtype=numpy.uint)], dtype=ca.dtype)
+        ca.transition_table = np.array([ca.rule // ca.stateset**n % ca.stateset for n in np.arange(ca.stateset**ca.size, dtype=np.uint)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
-            ca.de_Bruijn = [numpy.matrix(numpy.zeros ((ca.overlapset, ca.overlapset), numpy.uint)) for k in range(ca.stateset)]
-            for n in numpy.arange(ca.stateset**ca.size, dtype=numpy.uint):
+            ca.de_Bruijn = [np.matrix(np.zeros ((ca.overlapset, ca.overlapset), np.uint)) for k in range(ca.stateset)]
+            for n in np.arange(ca.stateset**ca.size, dtype=np.uint):
                 o_l = n // ca.stateset
                 o_r = n % (ca.overlapset)
                 ca.de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
         # construct the subset diagram
-        ca.Sf = [ [ common.list2int (common.list2bool (numpy.array(numpy.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(numpy.uint(2)**ca.overlapset) ] for c in range(ca.stateset) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (numpy.array(ca.de_Bruijn[c] * numpy.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(2**(ca.overlapset)) ] for c in range(ca.stateset) ]
+        ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(np.uint(2)**ca.overlapset) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(2**(ca.overlapset)) ] for c in range(ca.stateset) ]
 
     rule = property(get_rule, set_rule)
 
     def neighborhood_to_number(ca, neighborhood_array):
-        return numpy.sum(neighborhood_array * ca.weights)
+        return np.sum(neighborhood_array * ca.weights)
 
     def neighborhood_to_array (ca, neighborhood_number):
-        neighborhood_array = numpy.zeros(ca.size, dtype=ca.dtype)
-        for i in numpy.flip(numpy.arange(ca.size)):
+        neighborhood_array = np.zeros(ca.size, dtype=ca.dtype)
+        for i in np.flip(np.arange(ca.size)):
             neighborhood_array[i] = neighborhood_number % ca.stateset
             neighborhood_number = neighborhood_number / ca.stateset
         return neighborhood_array
     
     def GoE_count(ca, N):
-        M = numpy.zeros ((2**(ca.overlapset), 2**(ca.overlapset)), int)
+        M = np.zeros ((2**(ca.overlapset), 2**(ca.overlapset)), int)
         for c in range(ca.stateset):
             for i in range(2**(ca.overlapset)):
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
-        M = numpy.matrix (M)
-        V = numpy.zeros (2**(ca.overlapset), int)
+        M = np.matrix (M)
+        V = np.zeros (2**(ca.overlapset), int)
         V[2**(ca.overlapset)-1] = 1
-        V = numpy.matrix (V)
+        V = np.matrix (V)
         L = []
         for _ in range(N) :
             L.append (V[0,0])
@@ -185,9 +184,9 @@ class lattice():
 
     The configuration can be initialized from different data types depending on
     the number of dimensions:
-    1D -- numpy.ndarray, list or string
-    2D -- numpy.ndarray, list of lists or strings, or from images (png, bmp, ...)
-    nD -- numpy.ndarray only
+    1D -- np.ndarray, list or string
+    2D -- np.ndarray, list of lists or strings, or from images (png, bmp, ...)
+    nD -- np.ndarray only
 
     By default the internal arrays are of type 'uint8', the number of states
     per cell is limited to 256.
@@ -212,25 +211,25 @@ class lattice():
             lt.type = 'general'
         # parsing the input configuration
         if (lt.ca.dimensions == 1):
-            # 1D CA can be initialized from numpy.ndarray, list or string
-            if (type(configuration) in (numpy.ndarray, list)):
-                lt.configuration = numpy.array(configuration, dtype=ca.dtype)
+            # 1D CA can be initialized from np.ndarray, list or string
+            if (type(configuration) in (np.ndarray, list)):
+                lt.configuration = np.array(configuration, dtype=ca.dtype)
             elif (type(configuration) in (str,)):
-                lt.configuration = numpy.fromstring(configuration, dtype=ca.dtype) - ca.dtype(48)
+                lt.configuration = np.fromstring(configuration, dtype=ca.dtype) - ca.dtype(48)
             else:
                 print("Error: incompattible 1D configuration")
                 return
         elif (lt.ca.dimensions == 2):
-            # 2D CA can be initialized from numpy.ndarray, list of lists or strings, or from images
-            if (type(configuration) in (numpy.ndarray,)):
-                lt.configuration = numpy.array(C, dtype=ca.dtype)
+            # 2D CA can be initialized from np.ndarray, list of lists or strings, or from images
+            if (type(configuration) in (np.ndarray,)):
+                lt.configuration = np.array(C, dtype=ca.dtype)
             elif (type(configuration) in (list,)):
                 if (type(configuration[0]) in (list,)):
-                    lt.configuration = numpy.array(configuration, dtype=ca.dtype)
+                    lt.configuration = np.array(configuration, dtype=ca.dtype)
                 elif (type(configuration) in (string,)):
-                    lt.configuration = numpy.empty(len(configuration), dtype=ca.type)
+                    lt.configuration = np.empty(len(configuration), dtype=ca.type)
                     for y in range(len(configuration)):
-                        lt.configuration = numpy.fromstring(configuration[y], dtype=ca.dtype) - ca.dtype(48)
+                        lt.configuration = np.fromstring(configuration[y], dtype=ca.dtype) - ca.dtype(48)
                 else:
                     print("Error: incompattible 2D configuration")
                     return
@@ -238,15 +237,15 @@ class lattice():
                 print("Error: incompattible 2D configuration")
                 return
         else:
-            # nD CA where n>2 can only be initialized from numpy.ndarray
-            if (type(configuration) in (numpy.ndarray,)):
-                lt.configuration = numpy.array(configuration, dtype=ca.dtype)
+            # nD CA where n>2 can only be initialized from np.ndarray
+            if (type(configuration) in (np.ndarray,)):
+                lt.configuration = np.array(configuration, dtype=ca.dtype)
             else:
                 print("Error: incompattible nD configuration")
                 return
         lt.shape = lt.configuration.shape
         # an empty array for neighborhoods, can be used for temporal results
-        lt.Cn = numpy.empty(lt.shape, dtype=ca.dtype)
+        lt.Cn = np.empty(lt.shape, dtype=ca.dtype)
         # parsing the input boundary
         if (boundary in ('cyclic', 'open')):
             lt.boundary = boundary
@@ -264,16 +263,16 @@ class lattice():
         """
         if (lt.boundary == 'cyclic'):
             # calculate temporary neighborhoods array
-            neighborhoods = numpy.zeros(lt.configuration.shape, dtype=numpy.uint)
-            for i in numpy.ndindex(lt.shape):
-#                print(numpy.mod(lt.ca.index + [[i]], lt.shape))
-                neighborhood = lt.configuration[numpy.mod(lt.ca.index + [[i]], lt.shape[0])][0]
+            neighborhoods = np.zeros(lt.configuration.shape, dtype=np.uint)
+            for i in np.ndindex(lt.shape):
+#                print(np.mod(lt.ca.index + [[i]], lt.shape))
+                neighborhood = lt.configuration[np.mod(lt.ca.index + [[i]], lt.shape[0])][0]
 #                print(neighborhood)
                 neighborhoods[i] = lt.ca.neighborhood_to_number(neighborhood)
 #            print(neighborhoods)
             # calculate next configuration from neighborhoods
             # TODO: do not use a for loop for speed, and modify in place
-            for i in numpy.ndindex(lt.shape):
+            for i in np.ndindex(lt.shape):
                 lt.configuration[i] = lt.ca.transition_table[neighborhoods[i]]
         else:
             print("ERROR: boundary type not supported.")
@@ -297,7 +296,7 @@ class lattice():
             N = lt.shape[0]
             D = [None] * (N+1)
             if (boundary_vector == None):
-                D[0] = numpy.matrix(numpy.ones(lt.ca.overlapset, dtype=numpy.uint))
+                D[0] = np.matrix(np.ones(lt.ca.overlapset, dtype=np.uint))
             else:
                 D[0] = boundary_vector
             for x in range(N):
@@ -311,7 +310,7 @@ class lattice():
             N = lt.shape[0]
             D = [None] * (N+1)
             if (boundary_vector == None):
-                D[-1] = numpy.matrix(numpy.ones(lt.ca.overlapset, dtype=numpy.uint))
+                D[-1] = np.matrix(np.ones(lt.ca.overlapset, dtype=np.uint))
             else:
                 D[-1] = boundary_vector
             for x in range(N, 0, -1):
@@ -328,7 +327,7 @@ class lattice():
             D = [None] * (N+1)
             for x in range(N+1):
                 # Hadamard product
-                D[x] = numpy.matrix(numpy.multiply(Df[x], Db[x]))
+                D[x] = np.matrix(np.multiply(Df[x], Db[x]))
             return D
         else:
             print("ERROR: only 1D CA supported")
@@ -339,9 +338,9 @@ class lattice():
             N = lt.shape[0]
             M = [None] * (N+1)
             if (boundary_matrix == None):
-                M[0] = numpy.matrix(numpy.identity(int(lt.ca.overlapset), dtype=numpy.uint))
+                M[0] = np.matrix(np.identity(int(lt.ca.overlapset), dtype=np.uint))
             else:
-                M[0] = numpy.matrix(boundary_matrix)
+                M[0] = np.matrix(boundary_matrix)
             for x in range(N):
                 M[x+1] = M[x] * lt.ca.de_Bruijn[lt.configuration[x]]
             return M
@@ -353,9 +352,9 @@ class lattice():
             N = lt.shape[0]
             M = [None] * (N+1)
             if (boundary_matrix == None):
-                M[-1] = numpy.matrix(numpy.identity(int(lt.ca.overlapset), dtype=numpy.uint))
+                M[-1] = np.matrix(np.identity(int(lt.ca.overlapset), dtype=np.uint))
             else:
-                M[-1] = numpy.matrix(boundary_matrix)
+                M[-1] = np.matrix(boundary_matrix)
             for x in range(N, 0, -1):
                 M[x-1] = lt.ca.de_Bruijn[lt.configuration[x-1]] * M[x]
             return M
@@ -371,7 +370,7 @@ class lattice():
             for x in range(N+1):
                 # Hadamard product
                 # TODO: should the result be just a vector?
-                M[x] = numpy.matrix(numpy.multiply(Mf[x], Mb[x].T))
+                M[x] = np.matrix(np.multiply(Mf[x], Mb[x].T))
             return M
         else:
             print("ERROR: only 1D CA supported")
@@ -379,24 +378,24 @@ class lattice():
 
     def prev(lt):
         if (lt.ca.dimensions == 1):
-            N = numpy.uint(lt.shape[0])
+            N = np.uint(lt.shape[0])
 
             if (lt.boundary == 'cyclic'):
                 Db = lt.preimage_matrix_array_backward()
                 p = Db[0].trace()[0,0]
  
-                C_p = numpy.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
-                o_p0 = numpy.arange(lt.ca.overlapset, dtype=numpy.uint).repeat(Db[0].diagonal().A1.astype(numpy.int))
+                C_p = np.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
+                o_p0 = np.arange(lt.ca.overlapset, dtype=np.uint).repeat(Db[0].diagonal().A1.astype(np.intp))
                 o_p = o_p0
                 print(o_p)
                
-                for x in numpy.arange(N, dtype=numpy.uint) :
+                for x in np.arange(N, dtype=np.uint) :
                     i = 0
                     while (i<p) :
                         o_L = o_p[i]; o_R = o_p0[i]
-                        for c in numpy.arange(lt.ca.stateset, dtype=numpy.uint) :
+                        for c in np.arange(lt.ca.stateset, dtype=np.uint) :
                             n = o_L * lt.ca.stateset + c
-                            print(n, type(o_L), type(lt.ca.stateset), type(c))
+                            #print(n, type(o_L), type(lt.ca.stateset), type(c))
                             if (lt.configuration[x] == lt.ca.transition_table[n]) :
                                 o_x = n % (lt.ca.overlapset)
                                 p_i = Db[x][o_x,o_R]
@@ -408,7 +407,7 @@ class lattice():
                 return C_p
 
             elif (lt.boundary == 'open') :
-                b_L = b_R = numpy.matrix((lt.ca.overlapset)*[1])
+                b_L = b_R = np.matrix((lt.ca.overlapset)*[1])
                 lt.boundary_x_b = [b_R.T]
 #              else :
 #                b_L = (lt.boundary[0]); b_R = vector(lt.boundary[1])
