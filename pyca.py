@@ -144,11 +144,21 @@ class rule(object):
 
     def neighborhood_to_array (ca, neighborhood_number):
         neighborhood_array = np.zeros(ca.size, dtype=ca.dtype)
-        for i in np.flip(np.arange(ca.size)):
+        for i in np.flip(np.arange(np.intp(ca.size))):
             neighborhood_array[i] = neighborhood_number % ca.stateset
             neighborhood_number = neighborhood_number / ca.stateset
         return neighborhood_array
     
+    def overlap_to_number(ca, overlap_array):
+        return np.sum(overlap_array * ca.weights[0:-1])
+
+    def overlap_to_array (ca, overlap_number):
+        overlap_array = np.zeros(ca.size-np.uint(1), dtype=ca.dtype)
+        for i in np.flip(np.arange(np.intp(ca.size-np.uint(1)))):
+            overlap_array[i] = overlap_number % ca.stateset
+            overlap_number = overlap_number / ca.stateset
+        return overlap_array
+
     def GoE_count(ca, N):
         M = np.zeros ((ca.subset, ca.subset), int)
         for c in range(ca.stateset):
@@ -378,72 +388,71 @@ class lattice():
             print("ERROR: only 1D CA supported")
 
 
-    def previous(lt):
+    def previous(lt, boundary_left = None, boundary_right = None):
         if (lt.ca.dimensions == 1):
             N = np.uint(lt.shape[0])
 
             if (lt.boundary == 'cyclic'):
-                Db = lt.preimage_matrix_array_backward()
-                p = Db[0].trace()[0,0]
- 
+                # left boundary matrix
+                if (boundary_left == None):
+                    Ml = np.matrix(np.identity(int(lt.ca.overlapset), dtype=np.uint))
+                else:
+                    Ml = np.matrix(boundary_left)
+                # matrix array
+                Mb = lt.preimage_matrix_array_backward(boundary_right)
+                # number of preimages
+                p = (Ml*Mb[0]).trace()[0,0]
+                # array of preimages
                 preimages = np.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
-                o_p0 = np.arange(lt.ca.overlapset, dtype=np.uint).repeat(Db[0].diagonal().A1.astype(np.intp))
+                # initialize left side overlaps for each preimage
+                o_p0 = np.arange(lt.ca.overlapset, dtype=np.uint).repeat(Mb[0].diagonal().A1.astype(np.intp))
                 o_p = o_p0.copy()
-                print(o_p, p)
                
                 for x in np.arange(N, dtype=np.uint):
                     i = 0
-                    print()
-                    print(preimages)
-                    print("x=", x, " C[x]=", lt.configuration[x])
                     while (i<p):
                         o_L = o_p[i]; o_R = o_p0[i]
                         for cell in np.arange(lt.ca.stateset, dtype=np.uint):
                             n = o_L * lt.ca.stateset + cell
-                            print("i=", i, " cell=", cell, " n=", bin(n))
                             if (lt.configuration[x] == lt.ca.transition_table[n]):
                                 o_x = n % lt.ca.overlapset
-                                p_i = Db[x+np.uint(1)][o_x, o_R]
-                                print(Db[x+np.uint(1)])
-                                print("p_i="+str(p_i)+" [o_x, o_R]="+str([o_x, o_R]))
-                                for p_c in range(p_i):
-                                    print("i=",i,"x=",(x-1))
+                                p_i = Mb[x+np.uint(1)][o_x, o_R]
+                                for _ in range(p_i):
                                     preimages[i, np.mod(x+np.uint(1), N)] = cell
                                     o_p[i] = o_x
                                     i = i+1
 
                 return preimages
 
-            elif (lt.boundary == 'open') :
-                b_L = b_R = np.matrix((lt.ca.overlapset)*[1])
-                lt.boundary_x_b = [b_R.T]
-#              else :
-#                b_L = (lt.boundary[0]); b_R = vector(lt.boundary[1])
-#                lt.boundary_x_b = [b_R]
+            elif (lt.boundary == 'open'):
+                # left boundary vector
+                if (boundary_left == None):
+                    Dl = np.matrix(np.ones(lt.ca.overlapset, dtype=np.uint))
+                else:
+                    Dl = np.matrix(boundary_vector)
+                # vector array
+                Db = lt.preimage_vector_array_backward(boundary_right)
+                # number of preimages
+                p = (Dl*Db[0].T).sum()
+                # array of preimages
+                preimages = np.empty((p, lt.shape[0]+int(lt.ca.size)-1), dtype=lt.ca.dtype);
+                # left side overlaps for each preimage
+                o_p = np.array(np.arange(lt.ca.overlapset), dtype=np.uint).repeat(Db[0].A1.astype(np.intp))
+                # initialize left side overlaps for each preimage
+                for i in range(p) :
+                    preimages[i][0:np.intp(lt.ca.size-np.uint(1))] = lt.ca.overlap_to_array(o_p[i])
 
-                x = 0
-                for x in range(lt.N) :
-                    lt.boundary_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.boundary_x_b[x])
-                lt.p = (b_L * lt.boundary_x_b[lt.N-1])[0,0]
-
-                preimages = [lattice(lt.ca, (lt.N+lt.ca.size-1)*[0], lt.boundary) for i in range(lt.p)]
-                o_p = [];
-                for o in range(lt.ca.overlapset) :
-                    o_p.extend([o for d in range(b_L[0,o] * lt.boundary_x_b[lt.N][o,0])])
-                for i in range(lt.p) :
-                    preimages[i].Cc [0:lt.ca.size-1] = common.int2list(o_p[i], lt.ca.stateset, lt.ca.size-1)
-
-                for x in range(lt.N) :
+                for x in np.arange(N, dtype=np.uint):
                     i = 0
-                    while (i<lt.p) :
+                    while (i<p):
                         o_L = o_p[i];
-                        for c in range(lt.ca.stateset) :
-                            n = o_L * lt.ca.stateset + c
+                        for cell in np.arange(lt.ca.stateset, dtype=np.uint):
+                            n = o_L * lt.ca.stateset + cell
                             if (lt.configuration[x] == lt.ca.transition_table[n]) :
                                 o_x = n % (lt.ca.overlapset)
-                                p_i = lt.boundary_x_b[lt.N-x-1][o_x]
-                                for p_c in range(p_i) :
-                                    preimages[i].Cc [x+lt.ca.size-1] = c
+                                p_i = Db[x+np.uint(1)].A1[o_x]
+                                for _ in range(p_i) :
+                                    preimages[i][x+lt.ca.size-+np.uint(1)] = cell
                                     o_p[i] = o_x
                                     i = i+1
 
