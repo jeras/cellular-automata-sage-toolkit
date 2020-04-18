@@ -378,7 +378,7 @@ class lattice():
             print("ERROR: only 1D CA supported")
 
 
-    def prev(lt):
+    def previous(lt):
         if (lt.ca.dimensions == 1):
             N = np.uint(lt.shape[0])
 
@@ -386,27 +386,33 @@ class lattice():
                 Db = lt.preimage_matrix_array_backward()
                 p = Db[0].trace()[0,0]
  
-                C_p = np.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
+                preimages = np.empty((p, lt.shape[0]), dtype=lt.ca.dtype);
                 o_p0 = np.arange(lt.ca.overlapset, dtype=np.uint).repeat(Db[0].diagonal().A1.astype(np.intp))
-                o_p = o_p0
-                print(o_p)
+                o_p = o_p0.copy()
+                print(o_p, p)
                
-                for x in np.arange(N, dtype=np.uint) :
+                for x in np.arange(N, dtype=np.uint):
                     i = 0
-                    while (i<p) :
+                    print()
+                    print(preimages)
+                    print("x=", x, " C[x]=", lt.configuration[x])
+                    while (i<p):
                         o_L = o_p[i]; o_R = o_p0[i]
-                        for c in np.arange(lt.ca.stateset, dtype=np.uint) :
-                            n = o_L * lt.ca.stateset + c
-                            #print(n, type(o_L), type(lt.ca.stateset), type(c))
-                            if (lt.configuration[x] == lt.ca.transition_table[n]) :
-                                o_x = n % (lt.ca.overlapset)
-                                p_i = Db[x][o_x,o_R]
-                                for p_c in range(p_i) :
-                                    C_p[i][x % N] = c
+                        for cell in np.arange(lt.ca.stateset, dtype=np.uint):
+                            n = o_L * lt.ca.stateset + cell
+                            print("i=", i, " cell=", cell, " n=", bin(n))
+                            if (lt.configuration[x] == lt.ca.transition_table[n]):
+                                o_x = n % lt.ca.overlapset
+                                p_i = Db[x+np.uint(1)][o_x, o_R]
+                                print(Db[x+np.uint(1)])
+                                print("p_i="+str(p_i)+" [o_x, o_R]="+str([o_x, o_R]))
+                                for p_c in range(p_i):
+                                    print("i=",i,"x=",(x-1))
+                                    preimages[i, np.mod(x+np.uint(1), N)] = cell
                                     o_p[i] = o_x
                                     i = i+1
 
-                return C_p
+                return preimages
 
             elif (lt.boundary == 'open') :
                 b_L = b_R = np.matrix((lt.ca.overlapset)*[1])
@@ -420,12 +426,12 @@ class lattice():
                     lt.boundary_x_b.append (lt.ca.de_Bruijn[lt.configuration[lt.N-1-x]] * lt.boundary_x_b[x])
                 lt.p = (b_L * lt.boundary_x_b[lt.N-1])[0,0]
 
-                C_p = [lattice(lt.ca, (lt.N+lt.ca.size-1)*[0], lt.boundary) for i in range(lt.p)]
+                preimages = [lattice(lt.ca, (lt.N+lt.ca.size-1)*[0], lt.boundary) for i in range(lt.p)]
                 o_p = [];
                 for o in range(lt.ca.overlapset) :
                     o_p.extend([o for d in range(b_L[0,o] * lt.boundary_x_b[lt.N][o,0])])
                 for i in range(lt.p) :
-                    C_p[i].Cc [0:lt.ca.size-1] = common.int2list(o_p[i], lt.ca.stateset, lt.ca.size-1)
+                    preimages[i].Cc [0:lt.ca.size-1] = common.int2list(o_p[i], lt.ca.stateset, lt.ca.size-1)
 
                 for x in range(lt.N) :
                     i = 0
@@ -437,11 +443,11 @@ class lattice():
                                 o_x = n % (lt.ca.overlapset)
                                 p_i = lt.boundary_x_b[lt.N-x-1][o_x]
                                 for p_c in range(p_i) :
-                                    C_p[i].Cc [x+lt.ca.size-1] = c
+                                    preimages[i].Cc [x+lt.ca.size-1] = c
                                     o_p[i] = o_x
                                     i = i+1
 
-                return C_p
+                return preimages
 
             else :
                 print("Error: there is no preimage implementation for automata with more than 1 dimensions.")
