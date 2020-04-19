@@ -408,12 +408,15 @@ class lattice():
                 o_p0 = np.arange(lt.ca.overlapset, dtype=np.uint).repeat(Mb[0].diagonal().A1.astype(np.intp))
                 o_p = o_p0.copy()
                
+                # loop over lattice size
                 for x in np.arange(N, dtype=np.uint):
                     i = 0
                     while (i<p):
                         o_L = o_p[i]; o_R = o_p0[i]
+                        # forward extend overlap with each cell value
                         for cell in np.arange(lt.ca.stateset, dtype=np.uint):
                             n = o_L * lt.ca.stateset + cell
+                            # check if forward path leads to a preimage
                             if (lt.configuration[x] == lt.ca.transition_table[n]):
                                 o_x = n % lt.ca.overlapset
                                 p_i = Mb[x+np.uint(1)][o_x, o_R]
@@ -436,18 +439,21 @@ class lattice():
                 p = (Dl*Db[0].T).sum()
                 # array of preimages
                 preimages = np.empty((p, lt.shape[0]+int(lt.ca.size)-1), dtype=lt.ca.dtype);
-                # left side overlaps for each preimage
-                o_p = np.array(np.arange(lt.ca.overlapset), dtype=np.uint).repeat(Db[0].A1.astype(np.intp))
                 # initialize left side overlaps for each preimage
+                o_p = np.array(np.arange(lt.ca.overlapset), dtype=np.uint).repeat(Db[0].A1.astype(np.intp))
+                # initialize left side overlap cells for each preimage
                 for i in range(p) :
                     preimages[i][0:np.intp(lt.ca.size-np.uint(1))] = lt.ca.overlap_to_array(o_p[i])
 
+                # loop over lattice size
                 for x in np.arange(N, dtype=np.uint):
                     i = 0
                     while (i<p):
                         o_L = o_p[i];
+                        # forward extend overlap with each cell value
                         for cell in np.arange(lt.ca.stateset, dtype=np.uint):
                             n = o_L * lt.ca.stateset + cell
+                            # check if forward path leads to a preimage
                             if (lt.configuration[x] == lt.ca.transition_table[n]) :
                                 o_x = n % (lt.ca.overlapset)
                                 p_i = Db[x+np.uint(1)].A1[o_x]
