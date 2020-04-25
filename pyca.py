@@ -115,7 +115,7 @@ class rule(object):
         # size of the overlap set
         ca.overlapset = ca.stateset**(ca.size-np.uint(1))
         # size of subset diagram
-        ca.subset     = np.intp(2)**ca.stateset
+        ca.subset_size = 2**(2**int(ca.size-1))
 
     neighborhood = property(get_neighborhood, set_neighborhood)
 
@@ -128,16 +128,42 @@ class rule(object):
         ca.transition_table = np.array([ca.rule // ca.stateset**n % ca.stateset for n in np.arange(ca.stateset**ca.size, dtype=np.uint)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
-            ca.de_Bruijn = [np.matrix(np.zeros ((ca.overlapset, ca.overlapset), np.uint)) for k in range(ca.stateset)]
-            for n in np.arange(ca.stateset**ca.size, dtype=np.uint):
-                o_l = n // ca.stateset
-                o_r = n % (ca.overlapset)
-                ca.de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
-        # construct the subset diagram
-       #ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(ca.subset) ] for c in range(ca.stateset) ]
-       #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(ca.subset)) ] for c in range(ca.stateset) ]
+            # de Bruijn diagram as matrices
+            ca.de_Bruijn = ca.construct_de_Bruijn()
 
     rule = property(get_rule, set_rule)
+
+    def construct_de_Bruijn(ca):
+        # initialize zeroed matrices for each possible cell value
+        de_Bruijn = [np.matrix(np.zeros ((ca.overlapset, ca.overlapset), np.uint)) for k in range(ca.stateset)]
+        # for every neighborhood calculate left/right overlap
+        for n in np.arange(ca.stateset**ca.size, dtype=np.uint):
+            o_l = n // ca.stateset
+            o_r = n % (ca.overlapset)
+            # set matrix element connecting left and right overlap
+            de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
+        return de_Bruijn
+
+    # construct the subset diagram
+    def construct_subset(ca):
+        #subset = np.empty((ca.subset_size, ca.subset_size), dtype=int)
+        subset = np.zeros((ca.subset_size, ca.subset_size, ca.stateset), dtype=bool)
+        for i in range(ca.subset_size):
+            sl = np.matrix(ca.subset_to_array(i))
+            for j in range(ca.subset_size):
+                sr = np.matrix(ca.subset_to_array(j))
+                #f = np.empty(ca.stateset, dtype=int)
+                #b = np.empty(ca.stateset, dtype=int)
+                for cell in range(ca.stateset):
+                    f = np.all(np.logical_and((sl * ca.de_Bruijn[cell]).A1, sr) == sr.astype(np.bool))
+                    b = np.all(np.logical_and((ca.de_Bruijn[cell] * sr.T).T.A1, sl) == sl.astype(np.bool))
+                    #print()
+                    #print(f,b)
+                    subset[i,j,cell] = f and b
+                #print("[",i,j,"]=",subset[i,j])
+        return subset
+       #ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(ca.subset_size) ] for c in range(ca.stateset) ]
+       #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(ca.subset_size)) ] for c in range(ca.stateset) ]
 
     def neighborhood_to_number(ca, neighborhood_array):
         return np.sum(neighborhood_array * ca.weights)
@@ -159,14 +185,24 @@ class rule(object):
             overlap_number = overlap_number / ca.stateset
         return overlap_array
 
+    def subset_to_number(ca, subset_array):
+        return np.sum(subset_array * [2**i for i in range(len(subset_array))])
+
+    def subset_to_array (ca, subset_number):
+        subset_array = np.zeros(2**int(ca.size-1), dtype=int)
+        for i in np.arange(len(subset_array)):
+            subset_array[i] = subset_number % 2
+            subset_number = subset_number / 2
+        return subset_array
+
     def GoE_count(ca, N):
-        M = np.zeros ((ca.subset, ca.subset), int)
+        M = np.zeros ((ca.subset_size, ca.subset_size), int)
         for c in range(ca.stateset):
-            for i in range(ca.subset):
+            for i in range(ca.subset_size):
                  M[i][ca.Sf[c][i]] = M[i][ca.Sf[c][i]] + 1
         M = np.matrix (M)
-        V = np.zeros (ca.subset, int)
-        V[ca.subset-1] = 1
+        V = np.zeros (ca.subset_size, int)
+        V[ca.subset_size-1] = 1
         V = np.matrix (V)
         L = []
         for _ in range(N) :
@@ -277,11 +313,8 @@ class lattice():
             # calculate temporary neighborhoods array
             neighborhoods = np.zeros(lt.configuration.shape, dtype=np.uint)
             for i in np.ndindex(lt.shape):
-#                print(np.mod(lt.ca.index + [[i]], lt.shape))
                 neighborhood = lt.configuration[np.mod(lt.ca.index + [[i]], lt.shape[0])][0]
-#                print(neighborhood)
                 neighborhoods[i] = lt.ca.neighborhood_to_number(neighborhood)
-#            print(neighborhoods)
             # calculate next configuration from neighborhoods
             # TODO: do not use a for loop for speed, and modify in place
             for i in np.ndindex(lt.shape):
@@ -291,7 +324,7 @@ class lattice():
 
     def isGoE(lt):
         if ((lt.ca.dimensions == 1) and (lt.boundary == 'open')) :
-            s = lt.ca.subset-1
+            s = lt.ca.subset_size-1
             for x in range(lt.N) : s = lt.ca.Sf[lt.configuration[x]][s];
             return (s == 0)
         else :
