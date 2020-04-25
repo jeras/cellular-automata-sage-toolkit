@@ -125,7 +125,7 @@ class rule(object):
     def set_rule(ca, rule):
         ca.__rule = rule
         # build transition lookup table
-        ca.transition_table = np.array([ca.rule // ca.stateset**n % ca.stateset for n in np.arange(ca.stateset**ca.size, dtype=np.uint)], dtype=ca.dtype)
+        ca.transition_table = np.array([ca.rule // ca.stateset**neighborhood % ca.stateset for neighborhood in np.arange(ca.stateset**ca.size, dtype=np.uint)], dtype=ca.dtype)
         # for 1D CA some rule properties can be computed
         if (ca.dimensions == 1):
             # de Bruijn diagram as matrices
@@ -137,11 +137,11 @@ class rule(object):
         # initialize zeroed matrices for each possible cell value
         de_Bruijn = [np.matrix(np.zeros ((ca.overlapset, ca.overlapset), np.uint)) for k in range(ca.stateset)]
         # for every neighborhood calculate left/right overlap
-        for n in np.arange(ca.stateset**ca.size, dtype=np.uint):
-            o_l = n // ca.stateset
-            o_r = n % (ca.overlapset)
+        for neighborhood in np.arange(ca.stateset**ca.size, dtype=np.uint):
+            overlap_l = neighborhood // ca.stateset
+            overlap_r = neighborhood % ca.overlapset
             # set matrix element connecting left and right overlap
-            de_Bruijn [ca.transition_table[n]] [o_l, o_r] = 1
+            de_Bruijn [ca.transition_table[neighborhood]] [overlap_l, overlap_r] = 1
         return de_Bruijn
 
     # construct the subset diagram
@@ -377,6 +377,24 @@ class lattice():
         else:
             print("ERROR: only 1D CA supported")
 
+    def weight_vector_array(lt, boundary_vector_left = None, boundary_vector_right = None):
+        if (lt.ca.dimensions == 1):
+            N = lt.shape[0]
+            Df = lt.preimage_vector_array_forward (boundary_vector = boundary_vector_left )
+            Db = lt.preimage_vector_array_backward(boundary_vector = boundary_vector_right)
+            W = [None] * (N)
+            for x in range(N):
+                W[x] = np.zeros(lt.ca.stateset**lt.ca.size, dtype=np.uint)
+                # for every neighborhood calculate left/right overlap
+                for neighborhood in np.arange(lt.ca.stateset**lt.ca.size, dtype=np.uint):
+                    if (lt.configuration[x] == lt.ca.transition_table[neighborhood]):
+                        overlap_l = neighborhood // lt.ca.stateset
+                        overlap_r = neighborhood % lt.ca.overlapset
+                        # set weight element connecting left and right overlap
+                        W[x][neighborhood] = Df[x][0,overlap_l] * Db[x+1][0,overlap_r]
+            return W
+        else:
+            print("ERROR: only 1D CA supported")
 
     def preimage_matrix_array_forward(lt, boundary_matrix = None):
         if (lt.ca.dimensions == 1):
@@ -411,12 +429,12 @@ class lattice():
             N = lt.shape[0]
             Mf = lt.preimage_matrix_array_forward (boundary_matrix = boundary_matrix_left )
             Mb = lt.preimage_matrix_array_backward(boundary_matrix = boundary_matrix_right)
-            M = [None] * (N+1)
+            D = [None] * (N+1)
             for x in range(N+1):
                 # Hadamard product
                 # TODO: should the result be just a vector?
-                M[x] = np.matrix(np.multiply(Mf[x], Mb[x].T))
-            return M
+                D[x] = np.matrix(np.multiply(Mf[x], Mb[x].T))
+            return D
         else:
             print("ERROR: only 1D CA supported")
 
