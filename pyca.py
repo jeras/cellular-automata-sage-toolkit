@@ -45,7 +45,7 @@ EXAMPLES:
     sage: ca_img = ca_vizual.array2image (lt.run(2047), 2, 'rule110_random')
 """
 
-#import sage
+import sage
 import numpy       as np
 #import ca_vizual
 
@@ -165,6 +165,20 @@ class rule(object):
        #ca.Sf = [ [ common.list2int (common.list2bool (np.array(np.mat(common.int2list(i, ca.stateset, ca.overlapset)) * ca.de_Bruijn[c])[0]), ca.stateset) for i in range(ca.subset_size) ] for c in range(ca.stateset) ]
        #ca.Sb = [ [ common.list2int (common.list2bool (np.array(ca.de_Bruijn[c] * np.mat(common.int2list(i, ca.stateset, ca.overlapset)))[0]), ca.stateset) for i in range(ca.subset_size)) ] for c in range(ca.stateset) ]
 
+    # graph of the subset diagram
+    def construct_subset_graph(ca):
+        subset = ca.construct_subset()
+        vertices = {i: {} for i in range(subset.shape[0])}
+        for i in range(subset.shape[0]):
+            for j in range(subset.shape[1]):
+                for c in range(subset.shape[2]):
+                    if (subset[i,j,c]):
+                        vertices[i].update({j: c})
+        g = sage.graphs.digraph.DiGraph(vertices)
+        #g.delete_vertices(g.sources())
+        #g.delete_vertex(0)
+        return g
+    
     def neighborhood_to_number(ca, neighborhood_array):
         return np.sum(neighborhood_array * ca.weights)
 
@@ -438,6 +452,52 @@ class lattice():
         else:
             print("ERROR: only 1D CA supported")
 
+    def preimage_vector_graph(lt):
+        """
+        """
+        import xml.etree.ElementTree as ET
+
+        N = lt.shape[0]
+        H = lt.ca.overlapset
+        W = lt.weight_vector_array()
+
+        unit_x = 100 #800 / N
+        unit_y = 100 #200 / H
+
+        svg = ET.Element('svg', xmlns="http://www.w3.org/2000/svg", version="1.1",
+                         height="%s" % (unit_y*(H+1)), width="%s" % (unit_x*(N+2)))
+        for y in range(lt.ca.overlapset):
+            # vertical grid
+            path = ( "M %f %f " % (unit_x*(0.5), unit_y*(y+0.5)) +
+                     "l %f %f"  % (unit_x*(N), 0) )
+            ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+        for x in range(N):
+            # vertical grid
+            path = ("M %f %f " % (unit_x*(1+N), 0) +
+                    "l %f %f"  % (0, unit_y*(lt.ca.overlapset+2))
+                   )
+            ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+            for neighborhood in np.arange(lt.ca.stateset**lt.ca.size, dtype=np.uint):
+                if (lt.configuration[x] == lt.ca.transition_table[neighborhood]):
+                    overlap_l = np.intp(neighborhood // lt.ca.stateset)
+                    overlap_r = np.intp(neighborhood % lt.ca.overlapset)
+                    # vertical grid
+                    path = ("M %f %f " % (unit_x*(1+x), 0) +
+                            "l %f %f"  % (0, unit_y*(lt.ca.overlapset))
+                           )
+                    ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+                    # set weight element connecting left and right overlap
+                    path = ("M %f %f " % (unit_x*(1+x), float(unit_y*(0.5+overlap_l))) +
+                            "c %f %f," % (unit_x*0.5, 0) +
+                             " %f %f," % (unit_x*0.5, float(unit_y*(overlap_r-overlap_l))) +
+                             " %f %f " % (unit_x,     float(unit_y*(overlap_r-overlap_l)))
+                           )
+                    #print(path)
+                    style = {'stroke-width': str(float(W[x][neighborhood])), 'stroke': "black"}
+                    ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke-width': str(float(W[x][neighborhood])), 'stroke': "black"})
+                    #ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+        #ET.dump(svg)
+        return ET.tostring(svg)
 
     def previous(lt, boundary_left = None, boundary_right = None):
         if (lt.ca.dimensions == 1):
