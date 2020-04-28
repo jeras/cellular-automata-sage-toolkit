@@ -465,24 +465,26 @@ class lattice():
         unit_y = 100 #200 / H
 
         svg = ET.Element('svg', xmlns="http://www.w3.org/2000/svg", version="1.1",
-                         height="%s" % (unit_y*(H+1)), width="%s" % (unit_x*(N+2)))
+                         width="800",
+                         viewBox="0 0 %f %f" % (unit_x*(N+2), unit_y*(H+1)))
+        # horizontal grid
         for y in range(lt.ca.overlapset):
-            # vertical grid
             path = ( "M %f %f " % (unit_x*(0.5), unit_y*(y+0.5)) +
-                     "l %f %f"  % (unit_x*(N), 0) )
+                     "l %f %f"  % (unit_x*(N+1), 0) )
             ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+        # vertical grid
+        path = ("M %f %f " % (unit_x*(1), 0) +
+                "l %f %f"  % (0, unit_y*(lt.ca.overlapset))
+               )
+        ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
+        #
         for x in range(N):
-            # vertical grid
-            path = ("M %f %f " % (unit_x*(1+N), 0) +
-                    "l %f %f"  % (0, unit_y*(lt.ca.overlapset+2))
-                   )
-            ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
             for neighborhood in np.arange(lt.ca.stateset**lt.ca.size, dtype=np.uint):
                 if (lt.configuration[x] == lt.ca.transition_table[neighborhood]):
                     overlap_l = np.intp(neighborhood // lt.ca.stateset)
                     overlap_r = np.intp(neighborhood % lt.ca.overlapset)
                     # vertical grid
-                    path = ("M %f %f " % (unit_x*(1+x), 0) +
+                    path = ("M %f %f " % (unit_x*(1+x+1), 0) +
                             "l %f %f"  % (0, unit_y*(lt.ca.overlapset))
                            )
                     ET.SubElement(svg, "path", {'d': path, 'fill': 'none', 'stroke': "black"})
